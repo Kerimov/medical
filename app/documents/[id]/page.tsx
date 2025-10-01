@@ -364,12 +364,12 @@ export default function DocumentViewPage() {
 
           {/* Actions */}
           <div className="flex gap-4">
-            <Button asChild className="flex-1">
-              <a href={document.fileUrl} download={document.fileName}>
+            <a href={document.fileUrl} download={document.fileName} className="flex-1">
+              <Button className="w-full">
                 <Download className="mr-2 h-4 w-4" />
                 Скачать
-              </a>
-            </Button>
+              </Button>
+            </a>
             <Link href="/documents" className="flex-1">
               <Button variant="outline" className="w-full">
                 Закрыть

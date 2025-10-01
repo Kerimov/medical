@@ -28,20 +28,32 @@ export async function performOCRSpace(imageBase64: string): Promise<OCRSpaceResu
     
     const data = await response.json()
     
-    if (data.IsErroredOnProcessing) {
-      throw new Error(data.ErrorMessage?.[0] || 'OCR processing failed')
-    }
-    
+    // Даже если есть ошибка, проверяем, был ли распознан хоть какой-то текст
     const text = data.ParsedResults?.[0]?.ParsedText || ''
     const exitCode = data.ParsedResults?.[0]?.FileParseExitCode || 0
     
-    console.log(`[OCR.space] Recognition completed. Exit code: ${exitCode}`)
-    console.log(`[OCR.space] Extracted ${text.length} characters`)
-    
-    return {
-      text: text,
-      confidence: exitCode === 1 ? 0.85 : 0.60 // Оценочная уверенность
+    if (data.IsErroredOnProcessing && text.length === 0) {
+      const errorMsg = data.ErrorMessage?.[0] || data.ErrorDetails || 'OCR processing failed'
+      console.log(`[OCR.space] Error: ${errorMsg}`)
+      throw new Error(errorMsg)
     }
+    
+    // Если есть текст, считаем это успехом (даже если были warnings)
+    if (text.length > 0) {
+      console.log(`[OCR.space] Recognition completed. Exit code: ${exitCode}`)
+      console.log(`[OCR.space] Extracted ${text.length} characters`)
+      
+      if (data.IsErroredOnProcessing) {
+        console.log(`[OCR.space] Warning: ${data.ErrorMessage?.[0] || 'Partial success'}`)
+      }
+      
+      return {
+        text: text,
+        confidence: exitCode === 1 ? 0.85 : 0.70 // Оценочная уверенность
+      }
+    }
+    
+    throw new Error('No text extracted from document')
   } catch (error) {
     console.error('[OCR.space] Recognition error:', error)
     throw new Error('Ошибка распознавания текста через OCR.space')

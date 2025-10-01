@@ -131,11 +131,12 @@ async function processDocumentOCR(documentId: string) {
       return
     }
 
-    // ВАРИАНТ 1: Реальный OCR через OCR.space API ✅ АКТИВИРОВАН!
+    // Реальный OCR через OCR.space ✅ РАБОТАЕТ!
     const { performOCRSpace } = await import('@/lib/ocr-space')
     const { parseMedicalData } = await import('@/lib/ocr')
     
     try {
+      console.log('[OCR] Starting OCR.space processing...')
       const ocrResult = await performOCRSpace(document.fileUrl)
       const medicalData = parseMedicalData(ocrResult.text)
       
@@ -151,10 +152,10 @@ async function processDocumentOCR(documentId: string) {
         parsed: true
       })
       
-      console.log(`[OCR] Real OCR completed for document ${documentId}`)
+      console.log(`[OCR] OCR.space completed successfully for document ${documentId}`)
       return
     } catch (error) {
-      console.error('[OCR] Real OCR failed, falling back to mock data:', error)
+      console.error('[OCR] OCR.space failed, falling back to mock data:', error)
       // Если OCR не сработал, используем mock данные как fallback
     }
     

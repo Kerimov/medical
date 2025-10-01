@@ -1,5 +1,4 @@
 // OCR и парсинг медицинских документов
-import Tesseract from 'tesseract.js'
 import { createWorker } from 'tesseract.js'
 
 export interface OCRResult {
@@ -7,47 +6,50 @@ export interface OCRResult {
   confidence: number
 }
 
-// Выполнить OCR на изображении
-export async function performOCR(imageData: string): Promise<OCRResult> {
-  let worker: Tesseract.Worker | null = null
+// Выполнить OCR на изображении с Tesseract.js
+export async function performTesseractOCR(imageData: string): Promise<OCRResult> {
+  console.log('[Tesseract] Starting text recognition...')
+  
+  const worker = await createWorker({
+    logger: (m) => {
+      if (m.status === 'recognizing text') {
+        console.log(`[Tesseract] Progress: ${Math.round((m.progress || 0) * 100)}%`)
+      } else {
+        console.log(`[Tesseract] ${m.status}`)
+      }
+    }
+  })
   
   try {
-    console.log('[OCR] Starting text recognition...')
+    // Загружаем языки (русский и английский)
+    await worker.loadLanguage('rus+eng')
+    await worker.initialize('rus+eng')
     
-    // Создаем worker для Node.js окружения
-    worker = await createWorker('rus+eng', 1, {
-      logger: (m) => {
-        if (m.status === 'recognizing text' && m.progress) {
-          console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`)
-        }
-      }
+    // Настройки для лучшего распознавания медицинских документов
+    await worker.setParameters({
+      tessedit_pageseg_mode: 1, // Автоматическая сегментация с OSD
+      preserve_interword_spaces: '1',
     })
+    
+    console.log('[Tesseract] Languages loaded, starting recognition...')
     
     // Выполняем распознавание
     const { data } = await worker.recognize(imageData)
     
-    console.log(`[OCR] Recognition completed with ${data.confidence}% confidence`)
+    console.log(`[Tesseract] Recognition completed!`)
+    console.log(`[Tesseract] Confidence: ${data.confidence}%`)
+    console.log(`[Tesseract] Text length: ${data.text.length} characters`)
     
-    // Завершаем worker
     await worker.terminate()
     
     return {
       text: data.text,
-      confidence: data.confidence / 100 // Конвертируем в 0-1
+      confidence: data.confidence / 100
     }
   } catch (error) {
-    console.error('[OCR] Recognition error:', error)
-    
-    // Убеждаемся что worker завершен
-    if (worker) {
-      try {
-        await worker.terminate()
-      } catch (e) {
-        // Игнорируем ошибки при завершении
-      }
-    }
-    
-    throw new Error('Ошибка распознавания текста')
+    console.error('[Tesseract] Recognition error:', error)
+    await worker.terminate()
+    throw new Error('Ошибка распознавания текста через Tesseract')
   }
 }
 
@@ -157,23 +159,112 @@ function extractDoctor(text: string): string | undefined {
   return undefined
 }
 
+// Парсинг табличного формата (ДНКОМ и подобные)
+function parseTableFormat(text: string): MedicalIndicator[] {
+  const indicators: MedicalIndicator[] = []
+  
+  // Ищем строку с "Результат" и извлекаем числа после нее
+  const resultMatch = text.match(/Результат\s+([\s\S]+?)(?:Единицы|$)/i)
+  if (!resultMatch) return indicators
+  
+  const resultsText = resultMatch[1]
+  const resultNumbers = resultsText.match(/\d+[,.]?\d*/g) || []
+  
+  console.log(`[PARSER] Found ${resultNumbers.length} result values in table`)
+  
+  // Сопоставление показателей с референсными значениями
+  const mappings = [
+    { pattern: /Гемоглобин|Hb[^C]/i, name: 'Гемоглобин (Hb)', unit: 'г/л', min: 120, max: 160 },
+    { pattern: /Эритроциты|RBC/i, name: 'Эритроциты (RBC)', unit: 'млн/мкл', min: 4.0, max: 5.5 },
+    { pattern: /Гематокрит|HCT/i, name: 'Гематокрит (HCT)', unit: '%', min: 36, max: 48 },
+    { pattern: /Средний объем эритроцита|MCV/i, name: 'MCV', unit: 'фл', min: 80, max: 100 },
+    { pattern: /Среднее содержание Hb|МСН|MCH/i, name: 'MCH', unit: 'пг', min: 27, max: 34 },
+    { pattern: /Средняя концентрация|МСНС|MCHC/i, name: 'MCHC', unit: 'г/дл', min: 32, max: 36 },
+    { pattern: /Тромбоциты|PLT/i, name: 'Тромбоциты (PLT)', unit: 'тыс/мкл', min: 150, max: 400 },
+    { pattern: /Лейкоциты|WBC/i, name: 'Лейкоциты (WBC)', unit: 'тыс/мкл', min: 4.0, max: 9.0 },
+    { pattern: /Нейтрофилы[\s\(].*NEU/i, name: 'Нейтрофилы (%)', unit: '%', min: 47, max: 72 },
+    { pattern: /Лимфоциты|LYM/i, name: 'Лимфоциты', unit: '%', min: 19, max: 37 },
+    { pattern: /Моноциты|MON/i, name: 'Моноциты', unit: '%', min: 3, max: 11 },
+    { pattern: /Эозинофилы|EOS/i, name: 'Эозинофилы', unit: '%', min: 0.5, max: 5 },
+    { pattern: /Базофилы|BAS/i, name: 'Базофилы', unit: '%', min: 0, max: 1 },
+  ]
+  
+  // Находим какие показатели присутствуют в документе и их порядок
+  const foundIndicators: Array<{name: string, unit: string, min: number, max: number, index: number}> = []
+  
+  mappings.forEach((mapping, index) => {
+    const lines = text.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      if (mapping.pattern.test(lines[i])) {
+        foundIndicators.push({
+          name: mapping.name,
+          unit: mapping.unit,
+          min: mapping.min,
+          max: mapping.max,
+          index: i
+        })
+        break
+      }
+    }
+  })
+  
+  // Сортируем по порядку появления в документе
+  foundIndicators.sort((a, b) => a.index - b.index)
+  
+  console.log(`[PARSER] Found ${foundIndicators.length} indicators in document`)
+  
+  // Сопоставляем показатели со значениями
+  foundIndicators.forEach((ind, idx) => {
+    if (idx < resultNumbers.length) {
+      const valueStr = resultNumbers[idx].replace(',', '.')
+      const value = parseFloat(valueStr)
+      
+      if (!isNaN(value)) {
+        const isNormal = value >= ind.min && value <= ind.max
+        indicators.push({
+          name: ind.name,
+          value,
+          unit: ind.unit,
+          referenceMin: ind.min,
+          referenceMax: ind.max,
+          isNormal
+        })
+        
+        console.log(`[PARSER] Matched: ${ind.name} = ${value} ${ind.unit} (${isNormal ? 'NORM' : 'DEVIATION'})`)
+      }
+    }
+  })
+  
+  return indicators
+}
+
 // Извлечение показателей (анализы крови) - расширенный список
 function extractIndicators(text: string): MedicalIndicator[] {
+  // Сначала пробуем табличный формат
+  const tableIndicators = parseTableFormat(text)
+  if (tableIndicators.length > 0) {
+    console.log(`[PARSER] Using table format parser, found ${tableIndicators.length} indicators`)
+    return tableIndicators
+  }
+  
+  console.log('[PARSER] Table format not detected, trying standard format')
+  
   const indicators: MedicalIndicator[] = []
   
   // Полный список показателей для развернутого анализа крови
+  // Улучшенные паттерны - более гибкие для разных форматов документов
   const indicatorPatterns = [
     // Общие показатели
     {
       name: 'Гемоглобин (HGB)',
-      pattern: /(?:гемоглобин|hgb)[:\s]+(\d+\.?\d*)\s*(г\/л)?/i,
+      pattern: /(?:гемоглобин|hemoglobin|hgb|hb)[\s:,\-\.]*\s*(\d+[.,]?\d*)\s*(?:г\/л|g\/l|г\/дл)?/i,
       unit: 'г/л',
       refMin: 120,
       refMax: 160
     },
     {
       name: 'Эритроциты (RBC)',
-      pattern: /(?:эритроциты|rbc)[:\s]+(\d+\.?\d*)\s*(млн\/мкл|×10\^12\/л)?/i,
+      pattern: /(?:эритроциты|erythrocytes|rbc)[\s:,\-\.]*\s*(\d+[.,]?\d*)\s*(?:млн\/мкл|×10\^12\/л|10\^12\/l|×10\s*12)?/i,
       unit: 'млн/мкл',
       refMin: 4.0,
       refMax: 5.5
@@ -202,7 +293,7 @@ function extractIndicators(text: string): MedicalIndicator[] {
     // Лейкоцитарная формула
     {
       name: 'Лейкоциты (WBC)',
-      pattern: /(?:лейкоциты|wbc)[:\s]+(\d+\.?\d*)\s*(тыс\/мкл|×10\^9\/л)?/i,
+      pattern: /(?:лейкоциты|leukocytes|wbc)[\s:,\-\.]*\s*(\d+[.,]?\d*)\s*(?:тыс\/мкл|×10\^9\/л|10\^9\/l|×10\s*9)?/i,
       unit: 'тыс/мкл',
       refMin: 4.0,
       refMax: 9.0
@@ -313,26 +404,40 @@ function extractIndicators(text: string): MedicalIndicator[] {
   for (const { name, pattern, unit, refMin, refMax } of indicatorPatterns) {
     const match = text.match(pattern)
     if (match) {
-      const value = parseFloat(match[1])
-      const isNormal = value >= refMin && value <= refMax
+      // Заменяем запятую на точку для корректного парсинга
+      const valueStr = match[1].replace(',', '.')
+      const value = parseFloat(valueStr)
       
-      indicators.push({
-        name,
-        value,
-        unit,
-        referenceMin: refMin,
-        referenceMax: refMax,
-        isNormal
-      })
+      if (!isNaN(value)) {
+        const isNormal = value >= refMin && value <= refMax
+        
+        indicators.push({
+          name,
+          value,
+          unit,
+          referenceMin: refMin,
+          referenceMax: refMax,
+          isNormal
+        })
+        
+        console.log(`[PARSER] Found: ${name} = ${value} ${unit} (${isNormal ? 'NORM' : 'DEVIATION'})`)
+      }
     }
   }
   
+  console.log(`[PARSER] Total indicators found: ${indicators.length}`)
   return indicators
 }
 
 // Парсинг медицинских данных из текста
 export function parseMedicalData(text: string): ParsedMedicalData {
   console.log('[PARSER] Starting medical data extraction...')
+  console.log(`[PARSER] Text length: ${text.length} characters`)
+  
+  // Выводим первые 1500 символов для отладки (больше контекста)
+  console.log('[PARSER] ==== BEGIN TEXT ====')
+  console.log(text.substring(0, 1500))
+  console.log('[PARSER] ==== END SAMPLE ====')
   
   const studyType = extractStudyType(text)
   const studyDate = extractDate(text)
@@ -344,7 +449,7 @@ export function parseMedicalData(text: string): ParsedMedicalData {
   const lines = text.split('\n').filter(line => line.trim())
   const findings = lines.length > 5 ? lines.slice(-3).join(' ') : undefined
   
-  console.log(`[PARSER] Extracted: type=${studyType}, indicators=${indicators.length}`)
+  console.log(`[PARSER] Extracted: type=${studyType}, date=${studyDate?.toLocaleDateString()}, indicators=${indicators.length}`)
   
   return {
     studyType,
