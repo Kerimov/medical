@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
+import { AIChat } from '@/components/AIChat'
 import { 
   Activity, 
   Bell, 
@@ -165,18 +166,20 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <FileText className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Документы</CardTitle>
-              <CardDescription>
-                Храните анализы и медицинские документы
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full">Просмотреть</Button>
-            </CardContent>
-          </Card>
+            <Link href="/documents" className="block">
+              <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <FileText className="h-10 w-10 text-primary mb-3" />
+                  <CardTitle>Документы</CardTitle>
+                  <CardDescription>
+                    Храните анализы и медицинские документы
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button className="w-full">Открыть</Button>
+                </CardContent>
+              </Card>
+            </Link>
 
           <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
             <CardHeader>
@@ -253,6 +256,9 @@ export default function DashboardPage() {
           </Card>
         </div>
       </main>
+
+      {/* AI Chat Assistant */}
+      <AIChat />
     </div>
   )
 }

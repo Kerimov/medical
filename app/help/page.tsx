@@ -36,9 +36,12 @@ export default function HelpPage() {
                 <p className="font-semibold">Данные хранятся в памяти и удаляются при:</p>
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   <li>Перезапуске сервера разработки</li>
-                  <li>Изменении файлов проекта (hot reload)</li>
+                  <li className="line-through opacity-50">Изменении файлов проекта (hot reload) - ИСПРАВЛЕНО!</li>
                   <li>Перезагрузке компьютера</li>
                 </ul>
+                <div className="mt-2 p-2 bg-green-100 dark:bg-green-900 rounded text-sm">
+                  ✅ <strong>Новое:</strong> Данные теперь сохраняются при hot reload!
+                </div>
               </div>
               <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                 <Database className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -78,16 +81,23 @@ export default function HelpPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-muted-foreground">
-                  Откройте отладочный эндпоинт (только для разработки):
+                  Откройте отладочные эндпоинты (только для разработки):
                 </p>
-                <div className="p-3 bg-muted rounded-md font-mono text-sm">
-                  <a 
-                    href="/api/debug/users" 
-                    target="_blank"
-                    className="text-primary hover:underline"
-                  >
-                    http://localhost:3000/api/debug/users
-                  </a>
+                <div className="space-y-2">
+                  <div className="p-3 bg-muted rounded-md font-mono text-sm">
+                    <a 
+                      href="/api/debug/users" 
+                      target="_blank"
+                      className="text-primary hover:underline"
+                    >
+                      /api/debug/users
+                    </a>
+                    <p className="text-xs mt-1 text-muted-foreground">Список всех пользователей</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-md font-mono text-sm">
+                    <span className="text-destructive">/api/debug/clear-db</span>
+                    <p className="text-xs mt-1 text-muted-foreground">POST запрос для очистки БД</p>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Вы увидите количество зарегистрированных пользователей и их данные (без паролей)
