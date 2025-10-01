@@ -106,6 +106,63 @@ export default function DocumentViewPage() {
 
       <main className="container py-8">
         <div className="max-w-4xl mx-auto space-y-6">
+          {/* Health Summary */}
+          {document.indicators && document.indicators.length > 0 && (
+            <Card className={`border-2 ${
+              document.indicators.some(i => !i.isNormal)
+                ? 'border-destructive/50 bg-destructive/5'
+                : 'border-green-500/50 bg-green-50/50 dark:bg-green-950/20'
+            }`}>
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  {document.indicators.some(i => !i.isNormal) ? (
+                    <AlertCircle className="h-8 w-8 text-destructive flex-shrink-0 mt-1" />
+                  ) : (
+                    <CheckCircle className="h-8 w-8 text-green-600 flex-shrink-0 mt-1" />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold mb-2">
+                      {document.indicators.some(i => !i.isNormal) 
+                        ? '⚠️ Обнаружены отклонения от нормы'
+                        : '✅ Все показатели в норме'
+                      }
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4 mb-3">
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">
+                          {document.indicators.filter(i => i.isNormal).length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">В норме</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-destructive">
+                          {document.indicators.filter(i => !i.isNormal).length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Отклонения</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-primary">
+                          {document.indicators.length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Всего показателей</p>
+                      </div>
+                    </div>
+                    {document.indicators.some(i => !i.isNormal) && (
+                      <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                        <p className="text-sm font-medium text-destructive mb-1">
+                          🏥 Рекомендуется консультация врача
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Обнаруженные отклонения требуют внимания специалиста для интерпретации и назначения лечения при необходимости.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Document Info */}
           <Card>
             <CardHeader>
@@ -198,33 +255,65 @@ export default function DocumentViewPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {document.indicators.map((indicator, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                      <div className="flex items-center gap-3">
-                        {indicator.isNormal ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-destructive" />
-                        )}
-                        <div>
-                          <p className="font-medium">{indicator.name}</p>
-                          {indicator.referenceMin !== undefined && (
-                            <p className="text-xs text-muted-foreground">
-                              Норма: {indicator.referenceMin}-{indicator.referenceMax} {indicator.unit}
-                            </p>
+                  {document.indicators.map((indicator, index) => {
+                    const value = typeof indicator.value === 'number' ? indicator.value : parseFloat(indicator.value)
+                    const min = indicator.referenceMin || 0
+                    const max = indicator.referenceMax || 100
+                    
+                    // Определяем степень отклонения
+                    let deviationPercent = 0
+                    let deviationText = ''
+                    
+                    if (!indicator.isNormal) {
+                      if (value < min) {
+                        deviationPercent = ((min - value) / (max - min)) * 100
+                        deviationText = `↓ ${deviationPercent.toFixed(1)}%`
+                      } else {
+                        deviationPercent = ((value - max) / (max - min)) * 100
+                        deviationText = `↑ ${deviationPercent.toFixed(1)}%`
+                      }
+                    }
+                    
+                    return (
+                      <div 
+                        key={index} 
+                        className={`flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${
+                          indicator.isNormal 
+                            ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20' 
+                            : 'border-red-200 bg-red-50/50 dark:bg-red-950/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {indicator.isNormal ? (
+                            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                           )}
+                          <div>
+                            <p className="font-medium">{indicator.name}</p>
+                            {indicator.referenceMin !== undefined && (
+                              <p className="text-xs text-muted-foreground">
+                                Норма: {indicator.referenceMin}-{indicator.referenceMax} {indicator.unit}
+                              </p>
+                            )}
+                            {!indicator.isNormal && deviationText && (
+                              <p className="text-xs font-semibold text-destructive mt-1">
+                                Отклонение: {deviationText}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${!indicator.isNormal ? 'text-destructive' : ''}`}>
+                            {indicator.value} {indicator.unit}
+                          </p>
+                          <Badge variant={indicator.isNormal ? "default" : "destructive"} className="text-xs">
+                            {indicator.isNormal ? 'Норма' : 'Отклонение'}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold">
-                          {indicator.value} {indicator.unit}
-                        </p>
-                        <Badge variant={indicator.isNormal ? "default" : "destructive"} className="text-xs">
-                          {indicator.isNormal ? 'Норма' : 'Отклонение'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
