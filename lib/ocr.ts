@@ -163,7 +163,7 @@ function extractDoctor(text: string): string | undefined {
 function parseTableFormat(text: string): MedicalIndicator[] {
   const indicators: MedicalIndicator[] = []
   
-  // Для формата ДНКОМ ищем "Эритроцитарные параметры" и извлекаем значения
+  // Для формата ДНКОМ ищем "Эритроцитарные параметры" и извлекаем все значения
   const sections = [
     { header: 'Эритроцитарные параметры', indicators: [
       { name: 'Гемоглобин (Hb)', unit: 'г/л', min: 120, max: 160 },
@@ -172,30 +172,60 @@ function parseTableFormat(text: string): MedicalIndicator[] {
       { name: 'MCV', unit: 'фл', min: 80, max: 100 },
       { name: 'MCH', unit: 'пг', min: 27, max: 34 },
       { name: 'MCHC', unit: 'г/дл', min: 320, max: 360 },
+      { name: 'RDW', unit: '%', min: 11.5, max: 14.5 },
+      { name: 'RDW-SD', unit: 'фл', min: 35, max: 56 },
+      { name: 'Нормобласты (NRBC)', unit: '%', min: 0, max: 0 },
+      { name: 'Нормобласты (абс)', unit: 'тыс/мкл', min: 0, max: 0 },
+      { name: 'Макроциты (MacroR)', unit: '%', min: 0, max: 5 },
+      { name: 'Микроциты (MicroR)', unit: '%', min: 0, max: 5 },
     ]},
     { header: 'Тромбоцитарные параметры', indicators: [
       { name: 'Тромбоциты (PLT)', unit: 'тыс/мкл', min: 150, max: 400 },
+      { name: 'Тромбокрит (PCT)', unit: '%', min: 0.15, max: 0.40 },
+      { name: 'MPV', unit: 'фл', min: 7, max: 11 },
+      { name: 'PDW', unit: '%', min: 9, max: 17 },
+      { name: 'P-LCR', unit: '%', min: 13, max: 43 },
     ]},
     { header: 'Лейкоцитарные параметры', indicators: [
       { name: 'Лейкоциты (WBC)', unit: 'тыс/мкл', min: 4.0, max: 9.0 },
+      { name: 'Нейтрофилы абс (NEU)', unit: 'тыс/мкл', min: 2.0, max: 7.0 },
+      { name: 'Эозинофилы абс (EOS)', unit: 'тыс/мкл', min: 0.02, max: 0.5 },
+      { name: 'Базофилы абс (BAS)', unit: 'тыс/мкл', min: 0, max: 0.08 },
+      { name: 'Моноциты абс (MON)', unit: 'тыс/мкл', min: 0.2, max: 0.8 },
+      { name: 'Лимфоциты абс (LYM)', unit: 'тыс/мкл', min: 1.0, max: 4.5 },
+      { name: 'Незрелые гранулоциты (IG)', unit: 'тыс/мкл', min: 0, max: 0.05 },
+      { name: 'Реактивные лимфоциты', unit: 'тыс/мкл', min: 0, max: 0 },
+      { name: 'Плазматические клетки', unit: 'тыс/мкл', min: 0, max: 0 },
+      { name: 'Нейтрофилы % (NEU%)', unit: '%', min: 47, max: 72 },
+      { name: 'Эозинофилы % (EOS%)', unit: '%', min: 0.5, max: 5 },
+      { name: 'Базофилы % (BAS%)', unit: '%', min: 0, max: 1 },
+      { name: 'Моноциты % (MON%)', unit: '%', min: 3, max: 11 },
+      { name: 'Лимфоциты % (LYM%)', unit: '%', min: 19, max: 37 },
     ]}
   ]
   
-  sections.forEach(section => {
-    // Ищем секцию и "Результат" после нее
-    const sectionRegex = new RegExp(`${section.header}[\\s\\S]*?Результат\\s+([\\d,\\.\\s]+?)(?:Единицы|Референсные|${sections[sections.indexOf(section) + 1]?.header || '$'})`, 'i')
+  sections.forEach((section, sectionIdx) => {
+    // Ищем секцию и извлекаем значения до следующей секции
+    const nextSection = sections[sectionIdx + 1]
+    const sectionRegex = new RegExp(
+      `${section.header}[\\s\\S]*?(?:Результат)?[\\s\\S]*?([\\d,\\.\\s]+?)(?:${nextSection?.header || 'Единицы измерения|Референсные значения|$'})`, 
+      'i'
+    )
     const match = text.match(sectionRegex)
     
     if (match) {
+      // Извлекаем все числа из захваченной группы
       const values = match[1].match(/\d+[,.]?\d*/g) || []
       console.log(`[PARSER] Section "${section.header}": found ${values.length} values`)
       
+      // Сопоставляем значения с показателями
       section.indicators.forEach((ind, idx) => {
         if (idx < values.length) {
           const valueStr = values[idx].replace(',', '.')
           const value = parseFloat(valueStr)
           
-          if (!isNaN(value) && value > 0) {
+          // Фильтруем нулевые значения для показателей, которые должны быть > 0
+          if (!isNaN(value) && (value > 0 || ind.min === 0)) {
             const isNormal = value >= ind.min && value <= ind.max
             indicators.push({
               name: ind.name,
@@ -210,6 +240,8 @@ function parseTableFormat(text: string): MedicalIndicator[] {
           }
         }
       })
+    } else {
+      console.log(`[PARSER] Section "${section.header}": NOT FOUND`)
     }
   })
   

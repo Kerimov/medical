@@ -134,11 +134,32 @@ async function processDocumentOCR(documentId: string) {
     // Реальный OCR через OCR.space ✅ РАБОТАЕТ!
     const { performOCRSpace } = await import('@/lib/ocr-space')
     const { parseMedicalData } = await import('@/lib/ocr')
+    const { parseWithAI, getAIConfig } = await import('@/lib/ai-medical-parser')
     
     try {
       console.log('[OCR] Starting OCR.space processing...')
       const ocrResult = await performOCRSpace(document.fileUrl)
-      const medicalData = parseMedicalData(ocrResult.text)
+      
+      // УМНЫЙ ПАРСИНГ: сначала пробуем AI, потом fallback на regex
+      let medicalData
+      const aiConfig = getAIConfig()
+      
+      if (aiConfig) {
+        // 🤖 AI-ПАРСЕР: Универсальное распознавание любых форматов
+        try {
+          console.log(`[OCR] Using AI parser (${aiConfig.provider})...`)
+          medicalData = await parseWithAI(ocrResult.text, aiConfig)
+          console.log(`[OCR] ✅ AI parsing successful! Extracted ${medicalData.indicators.length} indicators`)
+        } catch (aiError) {
+          console.warn('[OCR] ⚠️ AI parsing failed, falling back to regex parser:', aiError)
+          medicalData = parseMedicalData(ocrResult.text)
+        }
+      } else {
+        // 📝 REGEX-ПАРСЕР: Базовое распознавание (работает только с некоторыми форматами)
+        console.log('[OCR] No AI config found, using regex parser')
+        console.log('[OCR] 💡 Tip: Add OPENAI_API_KEY to .env.local for universal parsing')
+        medicalData = parseMedicalData(ocrResult.text)
+      }
       
       documentsDb.update(documentId, {
         rawText: ocrResult.text,

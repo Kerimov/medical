@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AIChat } from '@/components/AIChat'
+import { ParserStatusBadge } from '@/components/parser-status-badge'
 import {
   Activity,
   Upload,
@@ -187,6 +188,7 @@ export default function DocumentsPage() {
             <span className="font-bold text-xl sm:hidden">ПМА</span>
           </Link>
           <div className="flex items-center gap-4">
+            <ParserStatusBadge />
             <Link href="/dashboard">
               <Button variant="ghost">← Назад</Button>
             </Link>

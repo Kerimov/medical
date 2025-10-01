@@ -4,13 +4,21 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { MessageCircle, Send, X, Bot, User, Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { MessageCircle, Send, X, Bot, User, Loader2, Paperclip, FileText, XCircle } from 'lucide-react'
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  attachedDocuments?: AttachedDocument[]
+}
+
+interface AttachedDocument {
+  id: string
+  fileName: string
+  studyType?: string
 }
 
 export function AIChat() {
@@ -19,12 +27,15 @@ export function AIChat() {
     {
       id: '1',
       role: 'assistant',
-      content: 'Здравствуйте! Я ваш персональный медицинский ассистент. Чем могу помочь?',
+      content: 'Здравствуйте! Я ваш персональный медицинский ассистент. Можете задавать вопросы или прикрепить медицинские документы для анализа.',
       timestamp: new Date()
     }
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [availableDocuments, setAvailableDocuments] = useState<AttachedDocument[]>([])
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
+  const [showDocumentSelector, setShowDocumentSelector] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -35,18 +46,60 @@ export function AIChat() {
     scrollToBottom()
   }, [messages])
 
+  // Загрузка доступных документов при открытии чата
+  useEffect(() => {
+    if (isOpen && availableDocuments.length === 0) {
+      fetchDocuments()
+    }
+  }, [isOpen])
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch('/api/documents')
+      if (response.ok) {
+        const data = await response.json()
+        setAvailableDocuments(data.documents.map((doc: any) => ({
+          id: doc.id,
+          fileName: doc.fileName,
+          studyType: doc.studyType
+        })))
+      }
+    } catch (error) {
+      console.error('Failed to fetch documents:', error)
+    }
+  }
+
+  const toggleDocumentSelection = (documentId: string) => {
+    setSelectedDocuments(prev =>
+      prev.includes(documentId)
+        ? prev.filter(id => id !== documentId)
+        : [...prev, documentId]
+    )
+  }
+
+  const removeSelectedDocument = (documentId: string) => {
+    setSelectedDocuments(prev => prev.filter(id => id !== documentId))
+  }
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return
+
+    const attachedDocs = selectedDocuments.map(id => 
+      availableDocuments.find(doc => doc.id === id)!
+    )
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
       content: input.trim(),
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachedDocuments: attachedDocs.length > 0 ? attachedDocs : undefined
     }
 
     setMessages(prev => [...prev, userMessage])
     setInput('')
+    setSelectedDocuments([])
+    setShowDocumentSelector(false)
     setIsLoading(true)
 
     try {
@@ -57,7 +110,8 @@ export function AIChat() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          history: messages
+          history: messages,
+          documentIds: selectedDocuments // Отправляем ID документов
         })
       })
 
@@ -140,20 +194,32 @@ export function AIChat() {
                 <Bot className="h-4 w-4 text-primary" />
               </div>
             )}
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
-            >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              <p className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </p>
+            <div className="flex flex-col gap-2 max-w-[80%]">
+              {message.attachedDocuments && message.attachedDocuments.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {message.attachedDocuments.map(doc => (
+                    <Badge key={doc.id} variant="outline" className="text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      {doc.studyType || doc.fileName}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <div
+                className={`rounded-lg px-4 py-2 ${
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="text-xs opacity-70 mt-1">
+                  {message.timestamp.toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
             </div>
             {message.role === 'user' && (
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
@@ -175,8 +241,72 @@ export function AIChat() {
         <div ref={messagesEndRef} />
       </CardContent>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t space-y-2">
+        {/* Прикрепленные документы */}
+        {selectedDocuments.length > 0 && (
+          <div className="flex flex-wrap gap-1 pb-2 border-b">
+            {selectedDocuments.map(docId => {
+              const doc = availableDocuments.find(d => d.id === docId)
+              return doc ? (
+                <Badge key={docId} variant="secondary" className="text-xs">
+                  <FileText className="h-3 w-3 mr-1" />
+                  {doc.studyType || doc.fileName}
+                  <button
+                    onClick={() => removeSelectedDocument(docId)}
+                    className="ml-1 hover:text-destructive"
+                  >
+                    <XCircle className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ) : null
+            })}
+          </div>
+        )}
+
+        {/* Селектор документов */}
+        {showDocumentSelector && (
+          <div className="mb-2 p-2 border rounded-lg bg-muted/50 max-h-32 overflow-y-auto">
+            {availableDocuments.length > 0 ? (
+              <div className="space-y-1">
+                {availableDocuments.map(doc => (
+                  <button
+                    key={doc.id}
+                    onClick={() => toggleDocumentSelection(doc.id)}
+                    className={`w-full text-left px-2 py-1 text-xs rounded hover:bg-background transition-colors ${
+                      selectedDocuments.includes(doc.id) ? 'bg-primary/10' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        {doc.studyType || doc.fileName}
+                      </span>
+                      {selectedDocuments.includes(doc.id) && (
+                        <span className="text-primary">✓</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Нет загруженных документов
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Ввод сообщения */}
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowDocumentSelector(!showDocumentSelector)}
+            disabled={isLoading}
+            title="Прикрепить документ"
+          >
+            <Paperclip className={`h-4 w-4 ${selectedDocuments.length > 0 ? 'text-primary' : ''}`} />
+          </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -197,7 +327,7 @@ export function AIChat() {
             )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           AI может ошибаться. Проверяйте важную информацию.
         </p>
       </div>

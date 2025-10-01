@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { documentsDb } from '@/lib/documents'
+import { verifyToken } from '@/lib/auth'
+import { parse as parseCookies } from 'cookie'
 
-// Временные ответы AI (позже заменить на OpenAI API или другой AI сервис)
+// Google Gemini AI для чата
 const medicalResponses: { [key: string]: string } = {
   default: 'Я ваш персональный медицинский ассистент. Я могу помочь вам с:\n\n• Напоминаниями о приеме лекарств\n• Записью симптомов в дневник здоровья\n• Информацией о визитах к врачу\n• Общими вопросами о здоровье\n\nЧем я могу помочь?',
   
@@ -66,7 +69,7 @@ function getAIResponse(message: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, history } = await request.json()
+    const { message, history, documentIds } = await request.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -75,32 +78,95 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Получаем ответ AI
-    const response = getAIResponse(message)
+    // Проверка авторизации для доступа к документам
+    const cookieHeader = request.headers.get('cookie')
+    const cookies = cookieHeader ? parseCookies(cookieHeader) : {}
+    const token = cookies.token
+    let userId: string | null = null
 
-    // Здесь можно добавить интеграцию с OpenAI API:
-    /*
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    })
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "Ты персональный медицинский ассистент. Помогаешь пользователям управлять здоровьем..."
-        },
-        ...history.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        { role: "user", content: message }
-      ]
-    })
-    
-    const response = completion.choices[0].message.content
-    */
+    if (token) {
+      const payload = verifyToken(token)
+      userId = payload?.userId
+    }
+
+    // Получаем контекст документов, если они прикреплены
+    let documentsContext = ''
+    if (documentIds && documentIds.length > 0 && userId) {
+      console.log('[AI-CHAT] Processing with', documentIds.length, 'attached documents')
+      
+      for (const docId of documentIds) {
+        const doc = documentsDb.findById(docId)
+        if (doc && doc.userId === userId) {
+          documentsContext += `\n\n[ДОКУМЕНТ: ${doc.fileName}]\n`
+          documentsContext += `Тип исследования: ${doc.studyType || 'Не определен'}\n`
+          documentsContext += `Дата: ${doc.studyDate ? new Date(doc.studyDate).toLocaleDateString('ru-RU') : 'Не указана'}\n`
+          
+          if (doc.indicators && doc.indicators.length > 0) {
+            documentsContext += '\nПоказатели:\n'
+            doc.indicators.forEach(ind => {
+              const status = ind.isNormal ? '✅ В норме' : '❌ Отклонение'
+              documentsContext += `- ${ind.name}: ${ind.value} ${ind.unit || ''} (норма: ${ind.referenceMin}-${ind.referenceMax}) ${status}\n`
+            })
+          }
+          
+          if (doc.findings) {
+            documentsContext += `\nЗаключение: ${doc.findings}\n`
+          }
+        }
+      }
+    }
+
+    // Используем Google Gemini API (если настроен)
+    if (process.env.GOOGLE_API_KEY) {
+      try {
+        const systemPrompt = `Ты - опытный медицинский ассистент. Ты помогаешь пациентам понимать их медицинские документы и анализы.
+
+ВАЖНО:
+- Объясняй медицинские термины простым языком
+- Если есть отклонения - объясни что они означают
+- Не ставь диагнозы - рекомендуй консультацию врача
+- Будь эмпатичным и успокаивающим
+- Если прикреплены документы - используй их данные для ответа
+
+${documentsContext ? 'ДАННЫЕ ИЗ ПРИКРЕПЛЕННЫХ ДОКУМЕНТОВ:' + documentsContext : ''}`
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `${systemPrompt}\n\nВопрос пациента: ${message}`
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000
+            }
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const aiResponse = data.candidates[0].content.parts[0].text
+          
+          console.log('[AI-CHAT] Gemini response generated successfully')
+          
+          return NextResponse.json({
+            response: aiResponse,
+            timestamp: new Date().toISOString()
+          })
+        }
+      } catch (geminiError) {
+        console.error('[AI-CHAT] Gemini error:', geminiError)
+        // Fallback to simple responses
+      }
+    }
+
+    // Fallback: простые ответы если Gemini не настроен
+    const response = getAIResponse(message)
 
     return NextResponse.json({
       response,
