@@ -163,75 +163,53 @@ function extractDoctor(text: string): string | undefined {
 function parseTableFormat(text: string): MedicalIndicator[] {
   const indicators: MedicalIndicator[] = []
   
-  // Ищем строку с "Результат" и извлекаем числа после нее
-  const resultMatch = text.match(/Результат\s+([\s\S]+?)(?:Единицы|$)/i)
-  if (!resultMatch) return indicators
-  
-  const resultsText = resultMatch[1]
-  const resultNumbers = resultsText.match(/\d+[,.]?\d*/g) || []
-  
-  console.log(`[PARSER] Found ${resultNumbers.length} result values in table`)
-  
-  // Сопоставление показателей с референсными значениями
-  const mappings = [
-    { pattern: /Гемоглобин|Hb[^C]/i, name: 'Гемоглобин (Hb)', unit: 'г/л', min: 120, max: 160 },
-    { pattern: /Эритроциты|RBC/i, name: 'Эритроциты (RBC)', unit: 'млн/мкл', min: 4.0, max: 5.5 },
-    { pattern: /Гематокрит|HCT/i, name: 'Гематокрит (HCT)', unit: '%', min: 36, max: 48 },
-    { pattern: /Средний объем эритроцита|MCV/i, name: 'MCV', unit: 'фл', min: 80, max: 100 },
-    { pattern: /Среднее содержание Hb|МСН|MCH/i, name: 'MCH', unit: 'пг', min: 27, max: 34 },
-    { pattern: /Средняя концентрация|МСНС|MCHC/i, name: 'MCHC', unit: 'г/дл', min: 32, max: 36 },
-    { pattern: /Тромбоциты|PLT/i, name: 'Тромбоциты (PLT)', unit: 'тыс/мкл', min: 150, max: 400 },
-    { pattern: /Лейкоциты|WBC/i, name: 'Лейкоциты (WBC)', unit: 'тыс/мкл', min: 4.0, max: 9.0 },
-    { pattern: /Нейтрофилы[\s\(].*NEU/i, name: 'Нейтрофилы (%)', unit: '%', min: 47, max: 72 },
-    { pattern: /Лимфоциты|LYM/i, name: 'Лимфоциты', unit: '%', min: 19, max: 37 },
-    { pattern: /Моноциты|MON/i, name: 'Моноциты', unit: '%', min: 3, max: 11 },
-    { pattern: /Эозинофилы|EOS/i, name: 'Эозинофилы', unit: '%', min: 0.5, max: 5 },
-    { pattern: /Базофилы|BAS/i, name: 'Базофилы', unit: '%', min: 0, max: 1 },
+  // Для формата ДНКОМ ищем "Эритроцитарные параметры" и извлекаем значения
+  const sections = [
+    { header: 'Эритроцитарные параметры', indicators: [
+      { name: 'Гемоглобин (Hb)', unit: 'г/л', min: 120, max: 160 },
+      { name: 'Эритроциты (RBC)', unit: 'млн/мкл', min: 4.0, max: 5.5 },
+      { name: 'Гематокрит (HCT)', unit: '%', min: 36, max: 48 },
+      { name: 'MCV', unit: 'фл', min: 80, max: 100 },
+      { name: 'MCH', unit: 'пг', min: 27, max: 34 },
+      { name: 'MCHC', unit: 'г/дл', min: 320, max: 360 },
+    ]},
+    { header: 'Тромбоцитарные параметры', indicators: [
+      { name: 'Тромбоциты (PLT)', unit: 'тыс/мкл', min: 150, max: 400 },
+    ]},
+    { header: 'Лейкоцитарные параметры', indicators: [
+      { name: 'Лейкоциты (WBC)', unit: 'тыс/мкл', min: 4.0, max: 9.0 },
+    ]}
   ]
   
-  // Находим какие показатели присутствуют в документе и их порядок
-  const foundIndicators: Array<{name: string, unit: string, min: number, max: number, index: number}> = []
-  
-  mappings.forEach((mapping, index) => {
-    const lines = text.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      if (mapping.pattern.test(lines[i])) {
-        foundIndicators.push({
-          name: mapping.name,
-          unit: mapping.unit,
-          min: mapping.min,
-          max: mapping.max,
-          index: i
-        })
-        break
-      }
-    }
-  })
-  
-  // Сортируем по порядку появления в документе
-  foundIndicators.sort((a, b) => a.index - b.index)
-  
-  console.log(`[PARSER] Found ${foundIndicators.length} indicators in document`)
-  
-  // Сопоставляем показатели со значениями
-  foundIndicators.forEach((ind, idx) => {
-    if (idx < resultNumbers.length) {
-      const valueStr = resultNumbers[idx].replace(',', '.')
-      const value = parseFloat(valueStr)
+  sections.forEach(section => {
+    // Ищем секцию и "Результат" после нее
+    const sectionRegex = new RegExp(`${section.header}[\\s\\S]*?Результат\\s+([\\d,\\.\\s]+?)(?:Единицы|Референсные|${sections[sections.indexOf(section) + 1]?.header || '$'})`, 'i')
+    const match = text.match(sectionRegex)
+    
+    if (match) {
+      const values = match[1].match(/\d+[,.]?\d*/g) || []
+      console.log(`[PARSER] Section "${section.header}": found ${values.length} values`)
       
-      if (!isNaN(value)) {
-        const isNormal = value >= ind.min && value <= ind.max
-        indicators.push({
-          name: ind.name,
-          value,
-          unit: ind.unit,
-          referenceMin: ind.min,
-          referenceMax: ind.max,
-          isNormal
-        })
-        
-        console.log(`[PARSER] Matched: ${ind.name} = ${value} ${ind.unit} (${isNormal ? 'NORM' : 'DEVIATION'})`)
-      }
+      section.indicators.forEach((ind, idx) => {
+        if (idx < values.length) {
+          const valueStr = values[idx].replace(',', '.')
+          const value = parseFloat(valueStr)
+          
+          if (!isNaN(value) && value > 0) {
+            const isNormal = value >= ind.min && value <= ind.max
+            indicators.push({
+              name: ind.name,
+              value,
+              unit: ind.unit,
+              referenceMin: ind.min,
+              referenceMax: ind.max,
+              isNormal
+            })
+            
+            console.log(`[PARSER] ${ind.name} = ${value} ${ind.unit} (${isNormal ? 'NORM' : 'DEVIATION'})`)
+          }
+        }
+      })
     }
   })
   

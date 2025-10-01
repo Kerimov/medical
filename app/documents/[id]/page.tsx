@@ -7,6 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
   Activity,
   ArrowLeft,
   FileText,
@@ -16,7 +24,8 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Download
+  Download,
+  AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -331,17 +340,115 @@ export default function DocumentViewPage() {
             </Card>
           )}
 
-          {/* Raw Text */}
+          {/* Parsed Data Table */}
           {document.rawText && (
             <Card>
               <CardHeader>
-                <CardTitle>Распознанный текст</CardTitle>
-                <CardDescription>Оригинальный текст документа</CardDescription>
+                <CardTitle>Данные документа</CardTitle>
+                <CardDescription>Структурированные данные из анализа</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg">
-                  {document.rawText}
-                </pre>
+                {(() => {
+                  // Парсим текст для создания таблицы
+                  const lines = document.rawText.split('\n')
+                  const tableData: Array<{param: string, value: string, ref?: string}> = []
+                  
+                  // Ищем секции с результатами
+                  let inResultSection = false
+                  let currentParams: string[] = []
+                  let paramIndex = 0
+                  
+                  lines.forEach((line, idx) => {
+                    const trimmed = line.trim()
+                    
+                    // Определяем начало секции с показателями
+                    if (trimmed.match(/Эритроцитарные|Тромбоцитарные|Лейкоцитарные/i)) {
+                      currentParams = []
+                      paramIndex = 0
+                      inResultSection = false
+                    }
+                    
+                    // Находим "Результат"
+                    if (trimmed === 'Результат') {
+                      inResultSection = true
+                      return
+                    }
+                    
+                    // Собираем названия показателей
+                    if (!inResultSection && trimmed && 
+                        !trimmed.match(/ЛАБОРАТОРИЯ|ДНКОМ|Научный|Ф\.И\.О\.|Дата|Регистрация|Биоматериал|Показатель|ОБЩИЙ АНАЛИЗ|параметры|Единицы|Референсные|Москва|Заявка|Заказчик|Исполнитель|\+7|ицензия|ИНН|ОГРН/i)) {
+                      // Это название показателя
+                      const match = trimmed.match(/^(.+?)\s*\(([A-Z\-]+)\)/)
+                      if (match) {
+                        currentParams.push(match[1] + ' (' + match[2] + ')')
+                      } else if (trimmed.length > 3 && trimmed.length < 100) {
+                        currentParams.push(trimmed)
+                      }
+                    }
+                    
+                    // Собираем значения
+                    if (inResultSection && trimmed.match(/^\d+[,.]?\d*$/)) {
+                      if (paramIndex < currentParams.length) {
+                        tableData.push({
+                          param: currentParams[paramIndex],
+                          value: trimmed
+                        })
+                        paramIndex++
+                      }
+                    }
+                  })
+                  
+                  return tableData.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50%]">Показатель</TableHead>
+                          <TableHead className="w-[25%]">Результат</TableHead>
+                          <TableHead className="w-[25%]">Статус</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tableData.map((row, idx) => {
+                          // Найти соответствующий indicator для статуса
+                          const indicator = document.indicators?.find(i => 
+                            i.name.toLowerCase().includes(row.param.toLowerCase().split('(')[0].trim().toLowerCase()) ||
+                            row.param.toLowerCase().includes(i.name.toLowerCase().split('(')[0].trim().toLowerCase())
+                          )
+                          
+                          return (
+                            <TableRow key={idx} className={indicator && !indicator.isNormal ? 'bg-red-50/50' : ''}>
+                              <TableCell className="font-medium">{row.param}</TableCell>
+                              <TableCell className="font-bold">{row.value}</TableCell>
+                              <TableCell>
+                                {indicator ? (
+                                  <div className="flex items-center gap-2">
+                                    {indicator.isNormal ? (
+                                      <>
+                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                        <span className="text-xs text-green-600">Норма</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <XCircle className="h-4 w-4 text-destructive" />
+                                        <span className="text-xs text-destructive">Отклонение</span>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg max-h-96 overflow-y-auto">
+                      {document.rawText}
+                    </pre>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}
