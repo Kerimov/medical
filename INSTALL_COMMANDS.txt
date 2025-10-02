@@ -1,0 +1,31 @@
+# Команды для быстрой установки (копируйте и вставляйте)
+
+# 1. Клонирование репозитория
+git clone <repository-url>
+cd medical
+
+# 2. Установка зависимостей
+npm install
+
+# 3. Настройка окружения
+cp env.example .env.local
+
+# 4. Инициализация базы данных
+npx prisma generate
+npx prisma db push
+node prisma/seed.js
+
+# 5. Запуск сервера
+npm run dev
+
+# 6. Откройте браузер
+# http://localhost:3000
+
+# 7. Войдите с тестовыми данными
+# Email: seed@example.com
+# Пароль: seed1234
+
+# Настройка .env.local (обязательно):
+# JWT_SECRET=my-super-secret-jwt-key-123456789
+# OPENAI_API_KEY=sk-proj-your-openai-key-here
+# NEXT_PUBLIC_ADMIN_EMAILS=your-email@example.com
