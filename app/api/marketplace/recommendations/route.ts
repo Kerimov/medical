@@ -19,12 +19,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
-    const status = searchParams.get('status') || 'ACTIVE'
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const status = searchParams.get('status')
+    const limit = parseInt(searchParams.get('limit') || '20')
 
     const where: any = {
-      userId: decoded.userId,
-      status: status as any
+      userId: decoded.userId
+    }
+
+    // Добавляем фильтр по статусу только если он указан
+    if (status && status !== 'all') {
+      where.status = status as any
     }
 
     if (type) {

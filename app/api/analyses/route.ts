@@ -5,12 +5,12 @@ import { createRecommendationsForUser } from '@/lib/ai-recommendations'
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
+    if (!token) {
       return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
     }
 
-    const token = authHeader.substring(7)
     const payload = verifyToken(token)
     if (!payload) {
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
@@ -33,12 +33,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
+    if (!token) {
       return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
     }
 
-    const token = authHeader.substring(7)
     const payload = verifyToken(token)
     if (!payload) {
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // Генерируем рекомендации, если анализ имеет отклонения
     if (status === 'abnormal') {
       try {
-        await createRecommendationsForUser(payload.userId)
+        await createRecommendationsForUser(payload.userId, analysis.id)
       } catch (error) {
         console.error('Error generating recommendations:', error)
         // Не прерываем создание анализа из-за ошибки рекомендаций

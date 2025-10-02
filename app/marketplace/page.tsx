@@ -11,11 +11,11 @@ import Link from 'next/link'
 
 interface Recommendation {
   id: string
-  type: 'LABORATORY' | 'PHARMACY' | 'CLINIC' | 'HEALTH_STORE' | 'ARTICLE' | 'SUPPLEMENT'
+  type: 'ANALYSIS' | 'SUPPLEMENT' | 'SERVICE' | 'ARTICLE' | 'PRODUCT'
   title: string
   description: string
   reason: string
-  priority: 'LOW' | 'MEDIUM' | 'HIGH'
+  priority: number
   status: 'ACTIVE' | 'VIEWED' | 'CLICKED' | 'PURCHASED' | 'DISMISSED'
   company?: {
     id: string
@@ -42,18 +42,23 @@ interface Recommendation {
 }
 
 const recommendationTypes = {
-  LABORATORY: { label: 'Лаборатория', icon: TestTube, color: 'bg-blue-100 text-blue-800' },
-  PHARMACY: { label: 'Аптека', icon: Pill, color: 'bg-green-100 text-green-800' },
-  CLINIC: { label: 'Клиника', icon: Heart, color: 'bg-red-100 text-red-800' },
-  HEALTH_STORE: { label: 'Магазин здоровья', icon: ShoppingBag, color: 'bg-purple-100 text-purple-800' },
+  ANALYSIS: { label: 'Анализ', icon: TestTube, color: 'bg-blue-100 text-blue-800' },
+  SERVICE: { label: 'Услуга', icon: Heart, color: 'bg-red-100 text-red-800' },
+  SUPPLEMENT: { label: 'БАД', icon: Pill, color: 'bg-orange-100 text-orange-800' },
   ARTICLE: { label: 'Статья', icon: AlertCircle, color: 'bg-yellow-100 text-yellow-800' },
-  SUPPLEMENT: { label: 'БАД', icon: Pill, color: 'bg-orange-100 text-orange-800' }
+  PRODUCT: { label: 'Товар', icon: ShoppingBag, color: 'bg-purple-100 text-purple-800' }
 }
 
-const priorityColors = {
-  HIGH: 'bg-red-100 text-red-800 border-red-200',
-  MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  LOW: 'bg-green-100 text-green-800 border-green-200'
+const getPriorityColor = (priority: number) => {
+  if (priority >= 4) return 'bg-red-100 text-red-800 border-red-200'
+  if (priority >= 3) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+  return 'bg-green-100 text-green-800 border-green-200'
+}
+
+const getPriorityLabel = (priority: number) => {
+  if (priority >= 4) return 'Высокий'
+  if (priority >= 3) return 'Средний'
+  return 'Низкий'
 }
 
 export default function MarketplacePage() {
@@ -62,6 +67,7 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true)
   const [selectedType, setSelectedType] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
+  const [limit, setLimit] = useState(10)
   const [error, setError] = useState<string | null>(null)
 
   const fetchRecommendations = async () => {
@@ -71,6 +77,7 @@ export default function MarketplacePage() {
 
       if (selectedType && selectedType !== 'all') params.append('type', selectedType)
       if (selectedStatus && selectedStatus !== 'all') params.append('status', selectedStatus)
+      params.append('limit', limit.toString())
 
       const response = await fetch(`/api/marketplace/recommendations?${params}`, {
         credentials: 'include' // Включаем cookies для аутентификации
@@ -190,12 +197,11 @@ export default function MarketplacePage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="LABORATORY">Лаборатории</SelectItem>
-              <SelectItem value="PHARMACY">Аптеки</SelectItem>
-              <SelectItem value="CLINIC">Клиники</SelectItem>
-              <SelectItem value="HEALTH_STORE">Магазины здоровья</SelectItem>
+              <SelectItem value="ANALYSIS">Анализы</SelectItem>
+              <SelectItem value="SERVICE">Услуги</SelectItem>
               <SelectItem value="SUPPLEMENT">БАД</SelectItem>
               <SelectItem value="ARTICLE">Статьи</SelectItem>
+              <SelectItem value="PRODUCT">Товары</SelectItem>
             </SelectContent>
           </Select>
 
@@ -272,10 +278,9 @@ export default function MarketplacePage() {
                           </Badge>
                           <Badge 
                             variant="outline" 
-                            className={priorityColors[recommendation.priority]}
+                            className={getPriorityColor(recommendation.priority)}
                           >
-                            {recommendation.priority === 'HIGH' ? 'Высокий' : 
-                             recommendation.priority === 'MEDIUM' ? 'Средний' : 'Низкий'} приоритет
+                            {getPriorityLabel(recommendation.priority)} приоритет
                           </Badge>
                         </div>
                       </div>
@@ -409,6 +414,19 @@ export default function MarketplacePage() {
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {/* Кнопка "Показать больше" */}
+      {recommendations.length >= limit && (
+        <div className="flex justify-center mt-6">
+          <Button 
+            onClick={() => setLimit(prev => prev + 10)}
+            variant="outline"
+            className="px-8"
+          >
+            Показать больше рекомендаций
+          </Button>
         </div>
       )}
     </div>

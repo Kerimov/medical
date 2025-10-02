@@ -438,17 +438,31 @@ const recommendationRules: RecommendationRule[] = [
 ]
 
 // Основная функция для генерации рекомендаций
-export async function generateRecommendationsForUser(userId: string): Promise<any[]> {
+export async function generateRecommendationsForUser(userId: string, analysisId?: string): Promise<any[]> {
   try {
-    // Получаем последние анализы пользователя
-    const analyses = await prisma.analysis.findMany({
-      where: {
-        userId,
-        status: 'abnormal' // Только анализы с отклонениями
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5 // Последние 5 анализов
-    })
+    // Получаем анализы пользователя
+    let analyses
+    if (analysisId) {
+      // Если указан конкретный анализ, получаем только его
+      const analysis = await prisma.analysis.findFirst({
+        where: {
+          id: analysisId,
+          userId,
+          status: 'abnormal'
+        }
+      })
+      analyses = analysis ? [analysis] : []
+    } else {
+      // Иначе получаем последние анализы с отклонениями
+      analyses = await prisma.analysis.findMany({
+        where: {
+          userId,
+          status: 'abnormal' // Только анализы с отклонениями
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5 // Последние 5 анализов
+      })
+    }
 
     if (analyses.length === 0) {
       return []
@@ -517,9 +531,9 @@ export async function generateRecommendationsForUser(userId: string): Promise<an
 }
 
 // Функция для создания рекомендаций в базе данных
-export async function createRecommendationsForUser(userId: string): Promise<any[]> {
+export async function createRecommendationsForUser(userId: string, analysisId?: string): Promise<any[]> {
   try {
-    const recommendations = await generateRecommendationsForUser(userId)
+    const recommendations = await generateRecommendationsForUser(userId, analysisId)
     
     if (recommendations.length === 0) {
       return []
@@ -551,7 +565,7 @@ export async function createRecommendationsForUser(userId: string): Promise<any[
               priority: rec.priority,
               companyId: rec.companyId,
               productId: rec.productId,
-              analysisId: rec.analysisId,
+              analysisId: analysisId || rec.analysisId, // Используем переданный analysisId или из рекомендации
               metadata: rec.metadata ? JSON.stringify(rec.metadata) : null,
               expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 дней
             },
