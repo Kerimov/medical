@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { prisma } from '@/lib/db'
 import { comparePasswords, generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -14,10 +14,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Поиск пользователя
-    const user = db.users.findByEmail(email)
+    // Поиск пользователя в БД
+    const user = await prisma.user.findUnique({ where: { email } })
     console.log('Login attempt for:', email)
-    console.log('Total users in DB:', db.users.getAll().length)
     
     if (!user) {
       return NextResponse.json(

@@ -164,25 +164,110 @@ async function processDocumentOCR(documentId: string) {
         medicalData = parseMedicalData(ocrResult.text)
       }
       
-      await prisma.document.update({
-        where: { id: documentId },
-        data: {
-          rawText: ocrResult.text,
-          ocrConfidence: ocrResult.confidence,
-          studyType: medicalData.studyType,
-          studyDate: medicalData.studyDate,
-          laboratory: medicalData.laboratory,
-          doctor: medicalData.doctor,
-          findings: medicalData.findings,
-          parsed: true
+      try {
+        await prisma.document.update({
+          where: { id: documentId },
+          data: {
+            rawText: ocrResult.text,
+            ocrConfidence: ocrResult.confidence,
+            studyType: medicalData.studyType,
+            studyDate: medicalData.studyDate,
+            laboratory: medicalData.laboratory,
+            doctor: medicalData.doctor,
+            findings: medicalData.findings,
+            indicators: medicalData.indicators ?? undefined,
+            parsed: true
+          }
+        })
+      } catch (e: any) {
+        if (e?.code === 'P2025') {
+          console.warn(`[OCR] Document ${documentId} was removed before update (real OCR). Skipping.`)
+          return
         }
-      })
+        throw e
+      }
       
       console.log(`[OCR] OCR.space completed successfully for document ${documentId}`)
       return
     } catch (error) {
-      console.error('[OCR] OCR.space failed, falling back to mock data:', error)
-      // Если OCR не сработал, используем mock данные как fallback
+      console.error('[OCR] OCR.space failed, trying OpenAI Vision before mock:', error)
+      // Попытка №2: Используем OpenAI Vision для извлечения текста с изображения
+      try {
+        const aiConfig = getAIConfig()
+        // Используем Vision только для изображений
+        if (aiConfig?.provider === 'openai' && aiConfig.apiKey && document.fileType.startsWith('image/')) {
+          const model = aiConfig.model || 'gpt-4o-mini'
+          const visionResp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${aiConfig.apiKey}`
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: 'system', content: 'Извлеки ПЛОСКИЙ текст из медицинского документа на изображении. Отвечай только текстом без форматирования и без комментариев.' },
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'Распознай текст на этом изображении (русский язык).' },
+                    { type: 'image_url', image_url: { url: document.fileUrl } }
+                  ]
+                }
+              ],
+              temperature: 0
+            })
+          })
+
+          if (!visionResp.ok) {
+            const errText = await visionResp.text()
+            throw new Error(`OpenAI Vision error: ${visionResp.status} - ${errText}`)
+          }
+
+          const visionJson = await visionResp.json()
+          const extractedText: string = visionJson.choices?.[0]?.message?.content || ''
+
+          if (extractedText && extractedText.trim().length > 0) {
+            // Парсим медицинские данные из извлеченного текста (AI > regex fallback внутри)
+            let medicalData
+            try {
+              medicalData = await parseWithAI(extractedText, aiConfig)
+            } catch (aiParseErr) {
+              console.warn('[OCR] AI parsing after Vision failed, fallback to regex:', aiParseErr)
+              const { parseMedicalData } = await import('@/lib/ocr')
+              medicalData = parseMedicalData(extractedText)
+            }
+
+            try {
+              await prisma.document.update({
+                where: { id: documentId },
+                data: {
+                  rawText: extractedText,
+                  ocrConfidence: 0.9,
+                  studyType: medicalData.studyType,
+                  studyDate: medicalData.studyDate,
+                  laboratory: medicalData.laboratory,
+                  doctor: medicalData.doctor,
+                  findings: medicalData.findings,
+                  indicators: medicalData.indicators ?? undefined,
+                  parsed: true
+                }
+              })
+              console.log(`[OCR] OpenAI Vision completed successfully for document ${documentId}`)
+              return
+            } catch (e: any) {
+              if (e?.code === 'P2025') {
+                console.warn(`[OCR] Document ${documentId} was removed before update (vision). Skipping.`)
+                return
+              }
+              throw e
+            }
+          }
+        }
+      } catch (visionError) {
+        console.error('[OCR] OpenAI Vision attempt failed:', visionError)
+      }
+      // Если ни OCR.space, ни OpenAI Vision не сработали — используем mock данные как fallback
     }
     
     // ВАРИАНТ 2: Mock данные (используются только если OCR не сработал)
@@ -514,7 +599,15 @@ ${hasDeviations
       ]
     }
 
-    await prisma.document.update({ where: { id: documentId }, data: mockData })
+    try {
+      await prisma.document.update({ where: { id: documentId }, data: mockData })
+    } catch (e: any) {
+      if (e?.code === 'P2025') {
+        console.warn(`[OCR] Document ${documentId} was removed before update (mock). Skipping.`)
+        return
+      }
+      throw e
+    }
     console.log(`[OCR] Processing completed for document ${documentId}`)
     
     /* Для продакшена - интеграция с Google Cloud Vision:
@@ -540,7 +633,15 @@ ${hasDeviations
     
   } catch (error) {
     console.error(`[OCR] Error processing document ${documentId}:`, error)
-    await prisma.document.update({ where: { id: documentId }, data: { parsed: false, ocrConfidence: 0 } })
+    try {
+      await prisma.document.update({ where: { id: documentId }, data: { parsed: false, ocrConfidence: 0 } })
+    } catch (e: any) {
+      if (e?.code === 'P2025') {
+        console.warn(`[OCR] Document ${documentId} was removed before error-state update. Skipping.`)
+        return
+      }
+      throw e
+    }
   }
 }
 

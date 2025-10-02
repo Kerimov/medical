@@ -1,4 +1,3 @@
-import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle, CheckCircle, Database, HelpCircle, RefreshCw } from 'lucide-react'
@@ -8,8 +7,6 @@ import { Button } from '@/components/ui/button'
 export default function HelpPage() {
   return (
     <div className="flex flex-col min-h-screen">
-      <Header />
-      
       <main className="flex-1 container py-12">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">

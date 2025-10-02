@@ -25,6 +25,16 @@ export function Header() {
           <Link href="/" className="transition-colors hover:text-primary">
             Главная
           </Link>
+          {user && (
+            <>
+              <Link href="/dashboard" className="transition-colors hover:text-primary">
+                Документы
+              </Link>
+              <Link href="/analyses" className="transition-colors hover:text-primary">
+                Анализы
+              </Link>
+            </>
+          )}
           <Link href="/features" className="transition-colors hover:text-primary">
             Возможности
           </Link>
@@ -83,6 +93,16 @@ export function Header() {
             <Link href="/" className="transition-colors hover:text-primary">
               Главная
             </Link>
+            {user && (
+              <>
+                <Link href="/dashboard" className="transition-colors hover:text-primary">
+                  Документы
+                </Link>
+                <Link href="/analyses" className="transition-colors hover:text-primary">
+                  Анализы
+                </Link>
+              </>
+            )}
             <Link href="/features" className="transition-colors hover:text-primary">
               Возможности
             </Link>

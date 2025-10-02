@@ -61,7 +61,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
     }
 
-    const document = documentsDb.findById(params.id)
+    const document = await prisma.document.findUnique({ where: { id: params.id } })
     
     if (!document) {
       return NextResponse.json({ error: 'Документ не найден' }, { status: 404 })

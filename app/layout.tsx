@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { Header } from '@/components/Header'
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
@@ -19,7 +20,12 @@ export default function RootLayout({
     <html lang="ru">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
+          <div className="flex flex-col min-h-screen">
+            <Header />
+            <main className="flex-1">
+              {children}
+            </main>
+          </div>
         </AuthProvider>
       </body>
     </html>

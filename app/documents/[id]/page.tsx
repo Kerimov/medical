@@ -99,22 +99,6 @@ export default function DocumentViewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/documents" className="flex items-center space-x-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl hidden sm:inline">Документы</span>
-          </Link>
-          <Link href="/documents">
-            <Button variant="ghost">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Назад
-            </Button>
-          </Link>
-        </div>
-      </header>
-
       <main className="container py-8">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Health Summary */}

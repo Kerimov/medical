@@ -179,16 +179,13 @@ export default function DocumentsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <Activity className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl hidden sm:inline">Персональный Медицинский Ассистент</span>
-            <span className="font-bold text-xl sm:hidden">ПМА</span>
-          </Link>
-          <div className="flex items-center gap-4">
+      <main className="container py-8">
+        {/* Top toolbar (inside page, to avoid duplicate global header) */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
             <ParserStatusBadge />
+          </div>
+          <div className="flex items-center gap-2">
             <Link href="/dashboard">
               <Button variant="ghost">← Назад</Button>
             </Link>
@@ -197,9 +194,7 @@ export default function DocumentsPage() {
             </Button>
           </div>
         </div>
-      </header>
 
-      <main className="container py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Мои документы</h1>
           <p className="text-muted-foreground">
