@@ -6,7 +6,8 @@ import { logger } from '@/lib/logger'
 // POST /api/marketplace/recommendations/generate - сгенерировать новые рекомендации
 export async function POST(request: NextRequest) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }

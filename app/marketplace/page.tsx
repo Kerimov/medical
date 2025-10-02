@@ -1,115 +1,154 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Star, MapPin, Phone, Globe, Clock, Search, Filter } from 'lucide-react'
+import { MapPin, Phone, Globe, Star, Heart, AlertCircle, TestTube, Pill, ShoppingBag } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import Link from 'next/link'
 
-interface Company {
+interface Recommendation {
   id: string
-  name: string
-  type: string
-  description?: string
-  address?: string
-  city?: string
-  phone?: string
-  website?: string
-  rating?: number
-  reviewCount: number
-  imageUrl?: string
-  services?: string[]
-  workingHours?: any
-  isVerified: boolean
-  products?: Product[]
-  _count: {
-    products: number
+  type: 'LABORATORY' | 'PHARMACY' | 'CLINIC' | 'HEALTH_STORE' | 'ARTICLE' | 'SUPPLEMENT'
+  title: string
+  description: string
+  reason: string
+  priority: 'LOW' | 'MEDIUM' | 'HIGH'
+  status: 'ACTIVE' | 'VIEWED' | 'CLICKED' | 'PURCHASED' | 'DISMISSED'
+  company?: {
+    id: string
+    name: string
+    type: string
+    address?: string
+    city?: string
+    phone?: string
+    website?: string
+    rating?: number
+    isVerified: boolean
   }
+  product?: {
+    id: string
+    name: string
+    price?: number
+    currency?: string
+    category?: string
+  }
+  analysisId?: string
+  metadata?: any
+  expiresAt?: string
+  createdAt: string
 }
 
-interface Product {
-  id: string
-  name: string
-  description?: string
-  category?: string
-  price?: number
-  currency: string
-  imageUrl?: string
-  tags?: string[]
+const recommendationTypes = {
+  LABORATORY: { label: 'Лаборатория', icon: TestTube, color: 'bg-blue-100 text-blue-800' },
+  PHARMACY: { label: 'Аптека', icon: Pill, color: 'bg-green-100 text-green-800' },
+  CLINIC: { label: 'Клиника', icon: Heart, color: 'bg-red-100 text-red-800' },
+  HEALTH_STORE: { label: 'Магазин здоровья', icon: ShoppingBag, color: 'bg-purple-100 text-purple-800' },
+  ARTICLE: { label: 'Статья', icon: AlertCircle, color: 'bg-yellow-100 text-yellow-800' },
+  SUPPLEMENT: { label: 'БАД', icon: Pill, color: 'bg-orange-100 text-orange-800' }
 }
 
-const companyTypes = {
-  CLINIC: 'Клиника',
-  LABORATORY: 'Лаборатория',
-  PHARMACY: 'Аптека',
-  HEALTH_STORE: 'Магазин здоровья',
-  FITNESS_CENTER: 'Фитнес-центр',
-  NUTRITIONIST: 'Диетолог',
-  OTHER: 'Другое'
+const priorityColors = {
+  HIGH: 'bg-red-100 text-red-800 border-red-200',
+  MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  LOW: 'bg-green-100 text-green-800 border-green-200'
 }
 
 export default function MarketplacePage() {
-  const { user, token } = useAuth()
-  const [companies, setCompanies] = useState<Company[]>([])
+  const { user } = useAuth()
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
   const [selectedType, setSelectedType] = useState('')
-  const [selectedCity, setSelectedCity] = useState('')
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 0
-  })
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchCompanies = async () => {
+  const fetchRecommendations = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
+      const params = new URLSearchParams()
+
+      if (selectedType && selectedType !== 'all') params.append('type', selectedType)
+      if (selectedStatus && selectedStatus !== 'all') params.append('status', selectedStatus)
+
+      const response = await fetch(`/api/marketplace/recommendations?${params}`, {
+        credentials: 'include' // Включаем cookies для аутентификации
       })
 
-      if (searchTerm) params.append('search', searchTerm)
-      if (selectedType) params.append('type', selectedType)
-      if (selectedCity) params.append('city', selectedCity)
-
-      const response = await fetch(`/api/marketplace/companies?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setCompanies(data.companies)
-        setPagination(data.pagination)
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки рекомендаций')
       }
+
+      const data = await response.json()
+      setRecommendations(data.recommendations || [])
     } catch (error) {
-      console.error('Error fetching companies:', error)
+      console.error('Error fetching recommendations:', error)
+      setError('Ошибка загрузки рекомендаций')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (token) {
-      fetchCompanies()
+    if (user) {
+      fetchRecommendations()
     }
-  }, [token, pagination.page, searchTerm, selectedType, selectedCity])
+  }, [user, selectedType, selectedStatus])
 
-  const handleSearch = () => {
-    setPagination(prev => ({ ...prev, page: 1 }))
-    fetchCompanies()
+  const handleRecommendationAction = async (recommendationId: string, action: 'view' | 'click' | 'purchase' | 'dismiss') => {
+    try {
+      await fetch(`/api/marketplace/recommendations/${recommendationId}/interact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Включаем cookies для аутентификации
+        body: JSON.stringify({ action })
+      })
+
+      // Обновляем статус локально
+      setRecommendations(prev => 
+        prev.map(rec => 
+          rec.id === recommendationId 
+            ? { ...rec, status: action.toUpperCase() as any }
+            : rec
+        )
+      )
+    } catch (error) {
+      console.error('Error updating recommendation:', error)
+    }
   }
 
-  const formatPrice = (price: number, currency: string) => {
+  const generateRecommendations = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/marketplace/recommendations/generate', {
+        method: 'POST',
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Ошибка генерации рекомендаций')
+      }
+
+      const data = await response.json()
+      console.log('Generated recommendations:', data)
+      
+      // Обновляем список рекомендаций
+      await fetchRecommendations()
+    } catch (error) {
+      console.error('Error generating recommendations:', error)
+      setError('Ошибка генерации рекомендаций')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatPrice = (price: number, currency: string = 'RUB') => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
-      currency: currency === 'RUB' ? 'RUB' : 'USD'
+      currency: currency
     }).format(price)
   }
 
@@ -118,7 +157,7 @@ export default function MarketplacePage() {
       <Star
         key={i}
         className={`w-4 h-4 ${
-          i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+          i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
         }`}
       />
     ))
@@ -128,8 +167,8 @@ export default function MarketplacePage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Маркетплейс</h1>
-          <p>Для доступа к маркетплейсу необходимо войти в систему</p>
+          <h1 className="text-2xl font-bold mb-4">Персональные рекомендации</h1>
+          <p className="text-gray-600">Войдите в систему для получения персональных рекомендаций</p>
         </div>
       </div>
     )
@@ -138,83 +177,114 @@ export default function MarketplacePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">Маркетплейс</h1>
-        <p className="text-gray-600 mb-6">
-          Найдите подходящие клиники, лаборатории, аптеки и магазины здорового питания
-        </p>
+        <h1 className="text-3xl font-bold mb-2">Персональные рекомендации</h1>
+        <p className="text-gray-600">Рекомендации на основе ваших анализов и состояния здоровья</p>
+      </div>
 
-        {/* Поиск и фильтры */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Поиск компаний..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
+      {/* Фильтры и действия */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger>
-              <SelectValue placeholder="Тип компании" />
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Тип рекомендации" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Все типы</SelectItem>
-              {Object.entries(companyTypes).map(([key, value]) => (
-                <SelectItem key={key} value={key}>{value}</SelectItem>
-              ))}
+              <SelectItem value="all">Все типы</SelectItem>
+              <SelectItem value="LABORATORY">Лаборатории</SelectItem>
+              <SelectItem value="PHARMACY">Аптеки</SelectItem>
+              <SelectItem value="CLINIC">Клиники</SelectItem>
+              <SelectItem value="HEALTH_STORE">Магазины здоровья</SelectItem>
+              <SelectItem value="SUPPLEMENT">БАД</SelectItem>
+              <SelectItem value="ARTICLE">Статьи</SelectItem>
             </SelectContent>
           </Select>
 
-          <Input
-            placeholder="Город"
-            value={selectedCity}
-            onChange={(e) => setSelectedCity(e.target.value)}
-          />
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Статус" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все статусы</SelectItem>
+              <SelectItem value="ACTIVE">Активные</SelectItem>
+              <SelectItem value="VIEWED">Просмотренные</SelectItem>
+              <SelectItem value="CLICKED">Открытые</SelectItem>
+              <SelectItem value="PURCHASED">Купленные</SelectItem>
+              <SelectItem value="DISMISSED">Отклоненные</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <Button onClick={handleSearch} className="flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            Найти
+          <Button 
+            onClick={generateRecommendations}
+            disabled={loading}
+            variant="outline"
+            className="w-full sm:w-auto"
+          >
+            {loading ? 'Генерация...' : 'Сгенерировать рекомендации'}
           </Button>
         </div>
       </div>
 
-      {/* Результаты */}
+      {/* Рекомендации */}
       {loading ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2">Загрузка...</p>
+          <p className="mt-2 text-gray-600">Загрузка рекомендаций...</p>
         </div>
-      ) : companies.length === 0 ? (
+      ) : error ? (
         <div className="text-center py-8">
-          <p className="text-gray-500">Компании не найдены</p>
+          <p className="text-red-600">{error}</p>
+          <Button onClick={fetchRecommendations} className="mt-4">
+            Попробовать снова
+          </Button>
+        </div>
+      ) : recommendations.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="mb-4">
+            <TestTube className="w-16 h-16 text-gray-400 mx-auto" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Нет рекомендаций</h3>
+          <p className="text-gray-600 mb-4">
+            Рекомендации появятся после загрузки и анализа ваших медицинских документов
+          </p>
+          <Link href="/analyses/new">
+            <Button>Загрузить анализ</Button>
+          </Link>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {companies.map((company) => (
-              <Card key={company.id} className="hover:shadow-lg transition-shadow">
+        <div className="space-y-6">
+          {recommendations.map((recommendation) => {
+            const typeInfo = recommendationTypes[recommendation.type]
+            const IconComponent = typeInfo.icon
+            
+            return (
+              <Card key={recommendation.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{company.name}</CardTitle>
-                      <CardDescription className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary">
-                          {companyTypes[company.type as keyof typeof companyTypes]}
-                        </Badge>
-                        {company.isVerified && (
-                          <Badge variant="default" className="bg-green-600">
-                            Проверено
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${typeInfo.color}`}>
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{recommendation.title}</CardTitle>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className={typeInfo.color}>
+                            {typeInfo.label}
                           </Badge>
-                        )}
-                      </CardDescription>
+                          <Badge 
+                            variant="outline" 
+                            className={priorityColors[recommendation.priority]}
+                          >
+                            {recommendation.priority === 'HIGH' ? 'Высокий' : 
+                             recommendation.priority === 'MEDIUM' ? 'Средний' : 'Низкий'} приоритет
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                    {company.rating && (
+                    {recommendation.company?.rating && (
                       <div className="flex items-center gap-1">
-                        {renderStars(company.rating)}
+                        {renderStars(recommendation.company.rating)}
                         <span className="text-sm text-gray-600 ml-1">
-                          ({company.reviewCount})
+                          ({recommendation.company.rating.toFixed(1)})
                         </span>
                       </div>
                     )}
@@ -222,117 +292,124 @@ export default function MarketplacePage() {
                 </CardHeader>
                 
                 <CardContent>
-                  {company.description && (
-                    <p className="text-sm text-gray-600 mb-3">{company.description}</p>
-                  )}
-                  
-                  <div className="space-y-2 mb-4">
-                    {company.address && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4" />
-                        <span>{company.address}, {company.city}</span>
-                      </div>
-                    )}
-                    
-                    {company.phone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="w-4 h-4" />
-                        <span>{company.phone}</span>
-                      </div>
-                    )}
-                    
-                    {company.website && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Globe className="w-4 h-4" />
-                        <a 
-                          href={company.website} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          Сайт
-                        </a>
-                      </div>
-                    )}
+                  <div className="mb-4">
+                    <p className="text-gray-700 mb-2">{recommendation.description}</p>
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        <strong>Причина рекомендации:</strong> {recommendation.reason}
+                      </p>
+                    </div>
                   </div>
 
-                  {company.services && company.services.length > 0 && (
+                  {recommendation.company && (
+                    <div className="space-y-2 mb-4">
+                      <h4 className="text-sm font-medium">Рекомендуемая организация:</h4>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="font-medium">{recommendation.company.name}</h5>
+                          {recommendation.company.isVerified && (
+                            <Badge variant="default" className="bg-green-600 text-white">
+                              Проверено
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1 text-sm text-gray-600">
+                          {recommendation.company.address && (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4" />
+                              <span>{recommendation.company.address}, {recommendation.company.city}</span>
+                            </div>
+                          )}
+                          
+                          {recommendation.company.phone && (
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4" />
+                              <span>{recommendation.company.phone}</span>
+                            </div>
+                          )}
+                          
+                          {recommendation.company.website && (
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4" />
+                              <a 
+                                href={recommendation.company.website} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                                onClick={() => handleRecommendationAction(recommendation.id, 'click')}
+                              >
+                                Сайт
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {recommendation.product && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2">Услуги:</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {company.services.slice(0, 3).map((service, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {service}
-                          </Badge>
-                        ))}
-                        {company.services.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{company.services.length - 3} еще
-                          </Badge>
+                      <h4 className="text-sm font-medium mb-2">Рекомендуемый товар:</h4>
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{recommendation.product.name}</span>
+                          {recommendation.product.price && (
+                            <span className="font-bold text-green-600">
+                              {formatPrice(recommendation.product.price, recommendation.product.currency)}
+                            </span>
+                          )}
+                        </div>
+                        {recommendation.product.category && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Категория: {recommendation.product.category}
+                          </p>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {company.products && company.products.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2">Товары:</h4>
-                      {company.products.slice(0, 2).map((product) => (
-                        <div key={product.id} className="flex justify-between items-center text-sm mb-1">
-                          <span>{product.name}</span>
-                          {product.price && (
-                            <span className="font-medium text-green-600">
-                              {formatPrice(product.price, product.currency)}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                      {company.products.length > 2 && (
-                        <p className="text-xs text-gray-500">
-                          и еще {company.products.length - 2} товаров
-                        </p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">
+                      Создано: {new Date(recommendation.createdAt).toLocaleDateString('ru-RU')}
+                    </span>
+                    <div className="flex gap-2">
+                      {recommendation.status === 'ACTIVE' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleRecommendationAction(recommendation.id, 'view')}
+                          >
+                            Подробнее
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleRecommendationAction(recommendation.id, 'dismiss')}
+                          >
+                            Отклонить
+                          </Button>
+                        </>
+                      )}
+                      {recommendation.status === 'VIEWED' && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleRecommendationAction(recommendation.id, 'dismiss')}
+                        >
+                          Отклонить
+                        </Button>
+                      )}
+                      {recommendation.status === 'DISMISSED' && (
+                        <span className="text-sm text-gray-500">Отклонено</span>
                       )}
                     </div>
-                  )}
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">
-                      {company._count.products} товаров
-                    </span>
-                    <Button size="sm" variant="outline">
-                      Подробнее
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-
-          {/* Пагинация */}
-          {pagination.pages > 1 && (
-            <div className="flex justify-center gap-2">
-              <Button
-                variant="outline"
-                disabled={pagination.page === 1}
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-              >
-                Назад
-              </Button>
-              
-              <span className="flex items-center px-4">
-                Страница {pagination.page} из {pagination.pages}
-              </span>
-              
-              <Button
-                variant="outline"
-                disabled={pagination.page === pagination.pages}
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              >
-                Вперед
-              </Button>
-            </div>
-          )}
-        </>
+            )
+          })}
+        </div>
       )}
     </div>
   )

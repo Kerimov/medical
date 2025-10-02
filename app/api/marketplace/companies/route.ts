@@ -70,8 +70,20 @@ export async function GET(request: NextRequest) {
       prisma.company.count({ where })
     ])
 
+    // Парсим JSON поля
+    const parsedCompanies = companies.map(company => ({
+      ...company,
+      services: company.services ? JSON.parse(company.services as string) : null,
+      workingHours: company.workingHours ? JSON.parse(company.workingHours as string) : null,
+      coordinates: company.coordinates ? JSON.parse(company.coordinates as string) : null,
+      products: company.products.map(product => ({
+        ...product,
+        tags: product.tags ? JSON.parse(product.tags as string) : null
+      }))
+    }))
+
     return NextResponse.json({
-      companies,
+      companies: parsedCompanies,
       pagination: {
         page,
         limit,

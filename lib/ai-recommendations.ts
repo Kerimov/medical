@@ -53,11 +53,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (laboratories.length > 0) {
         recommendations.push({
-          type: 'ANALYSIS',
+          type: 'LABORATORY',
           title: 'Повторный анализ на витамин D',
           description: `Рекомендуется повторный анализ на витамин D через 2-3 месяца. Текущий уровень: ${vitD?.value} ${vitD?.unit} (норма: ${vitD?.referenceMin}-${vitD?.referenceMax} ${vitD?.unit})`,
           reason: `Низкий уровень витамина D (${vitD?.value} ${vitD?.unit})`,
-          priority: 4,
+          priority: 'HIGH',
           companyId: laboratories[0].id,
           metadata: {
             testType: 'vitamin_d',
@@ -83,7 +83,7 @@ const recommendationRules: RecommendationRule[] = [
           title: 'Витамин D3 - биодобавка',
           description: 'Рекомендуется прием витамина D3 в дозировке 1000-2000 МЕ в день для коррекции дефицита',
           reason: `Дефицит витамина D (${vitD?.value} ${vitD?.unit})`,
-          priority: 5,
+          priority: 'HIGH',
           companyId: healthStores[0].id,
           metadata: {
             supplementType: 'vitamin_d3',
@@ -126,11 +126,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (clinics.length > 0) {
         recommendations.push({
-          type: 'SERVICE',
+          type: 'CLINIC',
           title: 'Консультация гематолога',
           description: `Низкий уровень гемоглобина (${hemoglobin?.value} ${hemoglobin?.unit}) требует консультации специалиста для выявления причины анемии`,
           reason: `Низкий гемоглобин (${hemoglobin?.value} ${hemoglobin?.unit})`,
-          priority: 5,
+          priority: 'HIGH',
           companyId: clinics[0].id,
           metadata: {
             specialty: 'гематолог',
@@ -152,11 +152,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (pharmacies.length > 0) {
         recommendations.push({
-          type: 'SUPPLEMENT',
+          type: 'PHARMACY',
           title: 'Препараты железа',
           description: 'Рекомендуется прием препаратов железа для коррекции анемии. Проконсультируйтесь с врачом о дозировке',
           reason: `Низкий гемоглобин (${hemoglobin?.value} ${hemoglobin?.unit})`,
-          priority: 4,
+          priority: 'MEDIUM',
           companyId: pharmacies[0].id,
           metadata: {
             supplementType: 'iron',
@@ -198,11 +198,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (clinics.length > 0) {
         recommendations.push({
-          type: 'SERVICE',
+          type: 'CLINIC',
           title: 'Консультация кардиолога',
           description: `Повышенный уровень холестерина (${cholesterol?.value} ${cholesterol?.unit}) требует консультации кардиолога для оценки сердечно-сосудистого риска`,
           reason: `Повышенный холестерин (${cholesterol?.value} ${cholesterol?.unit})`,
-          priority: 4,
+          priority: 'MEDIUM',
           companyId: clinics[0].id,
           metadata: {
             specialty: 'кардиолог',
@@ -224,11 +224,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (nutritionists.length > 0) {
         recommendations.push({
-          type: 'SERVICE',
+          type: 'CLINIC',
           title: 'Консультация диетолога',
           description: 'Рекомендуется консультация диетолога для составления плана питания, направленного на снижение холестерина',
           reason: `Повышенный холестерин (${cholesterol?.value} ${cholesterol?.unit})`,
-          priority: 3,
+          priority: 'LOW',
           companyId: nutritionists[0].id,
           metadata: {
             specialty: 'диетолог',
@@ -264,11 +264,11 @@ const recommendationRules: RecommendationRule[] = [
       
       if (clinics.length > 0) {
         recommendations.push({
-          type: 'SERVICE',
+          type: 'CLINIC',
           title: 'Комплексное медицинское обследование',
           description: `Обнаружено ${abnormalIndicators.length} отклонений в анализах. Рекомендуется комплексное обследование для выявления причин`,
           reason: `Множественные отклонения (${abnormalIndicators.length} показателей)`,
-          priority: 5,
+          priority: 'HIGH',
           companyId: clinics[0].id,
           metadata: {
             abnormalCount: abnormalIndicators.length,
@@ -280,6 +280,160 @@ const recommendationRules: RecommendationRule[] = [
       return recommendations
     },
     priority: 5
+  },
+
+  // Повышенный сахар в крови
+  {
+    condition: (indicators, analysis) => {
+      const glucose = indicators.find(ind => 
+        ind.name.toLowerCase().includes('глюкоза') || 
+        ind.name.toLowerCase().includes('сахар') ||
+        ind.name.toLowerCase().includes('glucose')
+      )
+      return glucose && glucose.isNormal === false && glucose.value > glucose.referenceMax
+    },
+    generateRecommendations: async (indicators, analysis) => {
+      const glucose = indicators.find(ind => 
+        ind.name.toLowerCase().includes('глюкоза') || 
+        ind.name.toLowerCase().includes('сахар') ||
+        ind.name.toLowerCase().includes('glucose')
+      )
+      
+      const recommendations = []
+      
+      // Рекомендация эндокринолога
+      const clinics = await prisma.company.findMany({
+        where: {
+          type: 'CLINIC',
+          isActive: true
+        },
+        take: 2
+      })
+      
+      if (clinics.length > 0) {
+        recommendations.push({
+          type: 'CLINIC',
+          title: 'Консультация эндокринолога',
+          description: `Повышенный уровень глюкозы (${glucose?.value} ${glucose?.unit}) требует консультации эндокринолога для исключения диабета`,
+          reason: `Повышенная глюкоза (${glucose?.value} ${glucose?.unit})`,
+          priority: 'HIGH',
+          companyId: clinics[0].id,
+          metadata: {
+            specialty: 'эндокринолог',
+            currentValue: glucose?.value,
+            normalRange: `${glucose?.referenceMin}-${glucose?.referenceMax}`,
+            unit: glucose?.unit
+          }
+        })
+      }
+      
+      return recommendations
+    },
+    priority: 5
+  },
+
+  // Низкий уровень железа
+  {
+    condition: (indicators, analysis) => {
+      const ferritin = indicators.find(ind => 
+        ind.name.toLowerCase().includes('ферритин') || 
+        ind.name.toLowerCase().includes('ferritin')
+      )
+      return ferritin && ferritin.isNormal === false && ferritin.value < ferritin.referenceMin
+    },
+    generateRecommendations: async (indicators, analysis) => {
+      const ferritin = indicators.find(ind => 
+        ind.name.toLowerCase().includes('ферритин') || 
+        ind.name.toLowerCase().includes('ferritin')
+      )
+      
+      const recommendations = []
+      
+      // Рекомендация препаратов железа
+      const pharmacies = await prisma.company.findMany({
+        where: {
+          type: 'PHARMACY',
+          isActive: true
+        },
+        take: 2
+      })
+      
+      if (pharmacies.length > 0) {
+        recommendations.push({
+          type: 'PHARMACY',
+          title: 'Препараты железа',
+          description: `Низкий уровень ферритина (${ferritin?.value} ${ferritin?.unit}) указывает на дефицит железа. Рекомендуется прием препаратов железа`,
+          reason: `Низкий ферритин (${ferritin?.value} ${ferritin?.unit})`,
+          priority: 'MEDIUM',
+          companyId: pharmacies[0].id,
+          metadata: {
+            supplementType: 'iron',
+            currentValue: ferritin?.value,
+            normalRange: `${ferritin?.referenceMin}-${ferritin?.referenceMax}`,
+            unit: ferritin?.unit
+          }
+        })
+      }
+      
+      return recommendations
+    },
+    priority: 4
+  },
+
+  // Повышенные печеночные ферменты
+  {
+    condition: (indicators, analysis) => {
+      const alt = indicators.find(ind => 
+        ind.name.toLowerCase().includes('алт') || 
+        ind.name.toLowerCase().includes('alt')
+      )
+      const ast = indicators.find(ind => 
+        ind.name.toLowerCase().includes('аст') || 
+        ind.name.toLowerCase().includes('ast')
+      )
+      return (alt && alt.isNormal === false && alt.value > alt.referenceMax) ||
+             (ast && ast.isNormal === false && ast.value > ast.referenceMax)
+    },
+    generateRecommendations: async (indicators, analysis) => {
+      const alt = indicators.find(ind => 
+        ind.name.toLowerCase().includes('алт') || 
+        ind.name.toLowerCase().includes('alt')
+      )
+      const ast = indicators.find(ind => 
+        ind.name.toLowerCase().includes('аст') || 
+        ind.name.toLowerCase().includes('ast')
+      )
+      
+      const recommendations = []
+      
+      // Рекомендация гепатолога
+      const clinics = await prisma.company.findMany({
+        where: {
+          type: 'CLINIC',
+          isActive: true
+        },
+        take: 2
+      })
+      
+      if (clinics.length > 0) {
+        recommendations.push({
+          type: 'CLINIC',
+          title: 'Консультация гепатолога',
+          description: `Повышенные печеночные ферменты требуют консультации специалиста для оценки состояния печени`,
+          reason: `Повышенные печеночные ферменты (АЛТ: ${alt?.value}, АСТ: ${ast?.value})`,
+          priority: 'MEDIUM',
+          companyId: clinics[0].id,
+          metadata: {
+            specialty: 'гепатолог',
+            altValue: alt?.value,
+            astValue: ast?.value
+          }
+        })
+      }
+      
+      return recommendations
+    },
+    priority: 4
   }
 ]
 
@@ -349,7 +503,13 @@ export async function generateRecommendationsForUser(userId: string): Promise<an
       )
     )
 
-    return uniqueRecommendations.sort((a, b) => b.priority - a.priority)
+    // Сортируем по приоритету (HIGH > MEDIUM > LOW)
+    const priorityOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 }
+    return uniqueRecommendations.sort((a, b) => {
+      const aPriority = typeof a.priority === 'string' ? priorityOrder[a.priority as keyof typeof priorityOrder] : a.priority
+      const bPriority = typeof b.priority === 'string' ? priorityOrder[b.priority as keyof typeof priorityOrder] : b.priority
+      return bPriority - aPriority
+    })
   } catch (error) {
     logger.error('Error generating recommendations for user:', error)
     return []

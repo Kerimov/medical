@@ -9,7 +9,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }

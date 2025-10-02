@@ -43,9 +43,6 @@ export function Header() {
                 Напоминания
               </Link>
               <Link href="/marketplace" className="transition-colors hover:text-primary">
-                Маркетплейс
-              </Link>
-              <Link href="/marketplace/recommendations" className="transition-colors hover:text-primary">
                 Рекомендации
               </Link>
             </>
@@ -121,9 +118,6 @@ export function Header() {
                       Напоминания
                     </Link>
                     <Link href="/marketplace" className="transition-colors hover:text-primary">
-                      Маркетплейс
-                    </Link>
-                    <Link href="/marketplace/recommendations" className="transition-colors hover:text-primary">
                       Рекомендации
                     </Link>
                   </>

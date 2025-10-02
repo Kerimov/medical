@@ -6,7 +6,8 @@ import { logger } from '@/lib/logger'
 // GET /api/marketplace/recommendations - получить персонализированные рекомендации
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
@@ -54,7 +55,10 @@ export async function GET(request: NextRequest) {
       take: limit
     })
 
-    return NextResponse.json(recommendations)
+    return NextResponse.json({
+      recommendations,
+      total: recommendations.length
+    })
   } catch (error) {
     logger.error('Error fetching recommendations:', error)
     return NextResponse.json({ error: 'Ошибка получения рекомендаций' }, { status: 500 })
@@ -64,7 +68,8 @@ export async function GET(request: NextRequest) {
 // POST /api/marketplace/recommendations - создать новую рекомендацию
 export async function POST(request: NextRequest) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    // Получаем токен из cookies
+    const token = request.cookies.get('token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
