@@ -15,6 +15,8 @@ model User {
   createdAt DateTime  @default(now())
   documents Document[]
   analyses  Analysis[]
+  reminders Reminder[]
+  reminderPreference ReminderPreference?
 }
 
 model Document {
@@ -39,6 +41,7 @@ model Document {
   notes         String?
   indicators    Json?
   analyses      Analysis[]
+  reminders     Reminder[]
 }
 
 model Analysis {
@@ -58,4 +61,67 @@ model Analysis {
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  reminders   Reminder[]
+}
+
+/// Напоминания и планирование
+enum ReminderRecurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum ReminderChannel {
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Reminder {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysisId  String?
+  analysis    Analysis?         @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  documentId  String?
+  document    Document?         @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  dueAt       DateTime
+  recurrence  ReminderRecurrence @default(NONE)
+  channels    Json // массив каналов в виде JSON: ["EMAIL","PUSH","SMS"]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deliveries  ReminderDelivery[]
+}
+
+model ReminderPreference {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     Boolean @default(true)
+  push      Boolean @default(true)
+  sms       Boolean @default(false)
+  timezone  String  @default("Europe/Moscow")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReminderDelivery {
+  id         String          @id @default(cuid())
+  reminderId String
+  reminder   Reminder        @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  channel    ReminderChannel
+  status     DeliveryStatus  @default(PENDING)
+  sentAt     DateTime?
+  error      String?
+  createdAt  DateTime        @default(now())
 }

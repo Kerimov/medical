@@ -1,4 +1,5 @@
 import { Activity, Mail, Phone, MapPin } from 'lucide-react'
+import { ParserStatusBadge } from '@/components/parser-status-badge'
 import Link from 'next/link'
 
 export function Footer() {
@@ -91,7 +92,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
+        <div className="mt-12 pt-8 border-t flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <div>
+            <ParserStatusBadge />
+          </div>
           <p>&copy; {new Date().getFullYear()} Персональный Медицинский Ассистент. Все права защищены.</p>
         </div>
       </div>

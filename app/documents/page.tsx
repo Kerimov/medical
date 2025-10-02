@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AIChat } from '@/components/AIChat'
-import { ParserStatusBadge } from '@/components/parser-status-badge'
 import {
   Activity,
   Upload,
@@ -242,7 +241,6 @@ export default function DocumentsPage() {
         {/* Top toolbar (inside page, to avoid duplicate global header) */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <ParserStatusBadge />
           </div>
           <div className="flex items-center gap-2">
             <Link href="/dashboard">

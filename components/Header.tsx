@@ -5,11 +5,17 @@ import { Activity, Menu, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { ParserStatusBadge } from '@/components/parser-status-badge'
+import { useRouter } from 'next/navigation'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/login')
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -47,17 +53,18 @@ export function Header() {
         </nav>
 
         <div className="flex items-center space-x-4">
-          <div className="hidden md:block">
-            <ParserStatusBadge />
-          </div>
+          <div className="hidden md:block"></div>
           {!isLoading && (
             user ? (
-              <Link href="/dashboard">
-                <Button variant="default" className="hidden md:inline-flex">
-                  <User className="mr-2 h-4 w-4" />
-                  Личный кабинет
-                </Button>
-              </Link>
+              <div className="hidden md:flex items-center gap-2">
+                <Link href="/dashboard">
+                  <Button variant="default">
+                    <User className="mr-2 h-4 w-4" />
+                    Личный кабинет
+                  </Button>
+                </Link>
+                <Button variant="outline" onClick={handleLogout}>Выйти</Button>
+              </div>
             ) : (
               <>
                 <Link href="/login">
@@ -113,7 +120,6 @@ export function Header() {
               Контакты
             </Link>
             <div className="flex flex-col space-y-2 pt-2">
-              <ParserStatusBadge />
               {!isLoading && (
                 user ? (
                   <Link href="/dashboard">
@@ -129,6 +135,9 @@ export function Header() {
                     </Link>
                   </>
                 )
+              )}
+              {user && (
+                <Button variant="outline" className="w-full" onClick={handleLogout}>Выйти</Button>
               )}
             </div>
           </nav>
