@@ -26,6 +26,8 @@ export default function DashboardPage() {
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [adminDocs, setAdminDocs] = useState<any[]>([])
   const [adminLoading, setAdminLoading] = useState(true)
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  const isAdmin = !!(user && adminEmails.includes(user.email.toLowerCase()))
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -35,7 +37,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const run = async () => {
-      if (!user) return
+      if (!user || !isAdmin) return
       try {
         setAdminLoading(true)
         // Берем токен из localStorage, если сохранен после логина
@@ -57,7 +59,7 @@ export default function DashboardPage() {
       }
     }
     run()
-  }, [user])
+  }, [user, isAdmin])
 
   if (isLoading) {
     return (
@@ -72,11 +74,6 @@ export default function DashboardPage() {
 
   if (!user) {
     return null
-  }
-
-  const handleLogout = () => {
-    logout()
-    router.push('/')
   }
 
   return (
@@ -232,76 +229,80 @@ export default function DashboardPage() {
         </div>
 
         {/* Admin (read-only) */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Админ: Пользователи (read-only)</CardTitle>
-              <CardDescription>Доступно только при авторизации</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {adminLoading ? (
-                <div className="text-sm text-muted-foreground">Загрузка...</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Имя</TableHead>
-                      <TableHead>Создан</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {adminUsers.map(u => (
-                      <TableRow key={u.id}>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>{u.name}</TableCell>
-                        <TableCell>{new Date(u.createdAt).toLocaleString('ru-RU')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {isAdmin && (
+          <>
+            <div className="mt-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Админ: Пользователи (read-only)</CardTitle>
+                  <CardDescription>Доступно только при авторизации</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {adminLoading ? (
+                    <div className="text-sm text-muted-foreground">Загрузка...</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Имя</TableHead>
+                          <TableHead>Создан</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminUsers.map(u => (
+                          <TableRow key={u.id}>
+                            <TableCell>{u.email}</TableCell>
+                            <TableCell>{u.name}</TableCell>
+                            <TableCell>{new Date(u.createdAt).toLocaleString('ru-RU')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-        <div className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Админ: Документы (read-only)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {adminLoading ? (
-                <div className="text-sm text-muted-foreground">Загрузка...</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Файл</TableHead>
-                      <TableHead>Тип</TableHead>
-                      <TableHead>Размер</TableHead>
-                      <TableHead>Пользователь</TableHead>
-                      <TableHead>Дата</TableHead>
-                      <TableHead>Статус</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {adminDocs.map(d => (
-                      <TableRow key={d.id}>
-                        <TableCell>{d.fileName}</TableCell>
-                        <TableCell>{d.fileType}</TableCell>
-                        <TableCell>{(d.fileSize/1024).toFixed(1)} KB</TableCell>
-                        <TableCell>{d.userId}</TableCell>
-                        <TableCell>{new Date(d.uploadDate).toLocaleString('ru-RU')}</TableCell>
-                        <TableCell>{d.parsed ? 'Обработан' : 'Новый'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+            <div className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Админ: Документы (read-only)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {adminLoading ? (
+                    <div className="text-sm text-muted-foreground">Загрузка...</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Файл</TableHead>
+                          <TableHead>Тип</TableHead>
+                          <TableHead>Размер</TableHead>
+                          <TableHead>Пользователь</TableHead>
+                          <TableHead>Дата</TableHead>
+                          <TableHead>Статус</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminDocs.map(d => (
+                          <TableRow key={d.id}>
+                            <TableCell>{d.fileName}</TableCell>
+                            <TableCell>{d.fileType}</TableCell>
+                            <TableCell>{(d.fileSize/1024).toFixed(1)} KB</TableCell>
+                            <TableCell>{d.userId}</TableCell>
+                            <TableCell>{new Date(d.uploadDate).toLocaleString('ru-RU')}</TableCell>
+                            <TableCell>{d.parsed ? 'Обработан' : 'Новый'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
 
         {/* Recent Activity */}
         <div className="mt-8">
