@@ -19,7 +19,7 @@ export async function DELETE(
     }
 
     // Проверяем права администратора
-    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
     const adminUser = await prisma.user.findUnique({
       where: { id: decoded.userId }
     })
@@ -74,7 +74,7 @@ export async function PUT(
     }
 
     // Проверяем права администратора
-    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
     const adminUser = await prisma.user.findUnique({
       where: { id: decoded.userId }
     })

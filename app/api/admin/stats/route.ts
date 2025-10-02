@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Проверяем права администратора
-    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId }
     })

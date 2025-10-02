@@ -46,7 +46,7 @@ export function Header() {
               <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Рекомендации
               </Link>
-              {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+              {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
                 <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
                   <Shield className="h-4 w-4" />
                   Админ
@@ -156,7 +156,7 @@ export function Header() {
                   <Bell className="h-4 w-4" />
                   Напоминания
                 </Link>
-                {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+                {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
                   <Link 
                     href="/admin" 
                     className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
