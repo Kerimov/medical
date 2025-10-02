@@ -24,7 +24,7 @@ interface Analysis {
   date: string
   laboratory?: string
   doctor?: string
-  results: AnalysisResult
+  results: string // JSON string from API
   normalRange?: string
   status: 'normal' | 'abnormal' | 'critical'
   notes?: string
@@ -40,6 +40,8 @@ export default function AnalysisDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generated, setGenerated] = useState<string | null>(null)
 
   useEffect(() => {
     if (token && params.id) {
@@ -98,6 +100,30 @@ export default function AnalysisDetailPage() {
     }
   }
 
+  const handleGenerate = async () => {
+    if (!analysis) return
+    try {
+      setGenerating(true)
+      setError(null)
+      const res = await fetch(`/api/analyses/${analysis.id}/comments`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Ошибка генерации комментариев')
+      }
+      const data = await res.json()
+      setGenerated(data.comment)
+      // обновим анализ
+      await fetchAnalysis()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Произошла ошибка')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'normal':
@@ -130,6 +156,31 @@ export default function AnalysisDetailPage() {
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const parseAnalysisResults = (resultsString: string): AnalysisResult => {
+    try {
+      const parsed = JSON.parse(resultsString)
+      // Если это объект с indicators, извлекаем их
+      if (parsed.indicators && Array.isArray(parsed.indicators)) {
+        const result: AnalysisResult = {}
+        parsed.indicators.forEach((indicator: any) => {
+          if (indicator.name) {
+            result[indicator.name] = {
+              value: indicator.value || '',
+              unit: indicator.unit || '',
+              normal: indicator.isNormal !== false
+            }
+          }
+        })
+        return result
+      }
+      // Если это уже готовый объект результатов
+      return parsed
+    } catch (error) {
+      console.error('Error parsing analysis results:', error)
+      return {}
+    }
   }
 
   if (!user) {
@@ -191,6 +242,9 @@ export default function AnalysisDetailPage() {
               Редактировать
             </Button>
           </Link>
+          <Button size="sm" onClick={handleGenerate} disabled={generating}>
+            {generating ? 'Генерация...' : 'Сгенерировать комментарии'}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -259,54 +313,81 @@ export default function AnalysisDetailPage() {
         </Card>
 
         {/* Результаты анализов */}
-        {analysis.results && Object.keys(analysis.results).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Результаты анализов</CardTitle>
-              <CardDescription>Показатели и их значения</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(analysis.results).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className={`p-4 border rounded-lg ${
-                      value.normal === false ? 'border-red-200 bg-red-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-semibold">{key}</h4>
-                        <p className={`text-lg font-medium ${
-                          value.normal === false ? 'text-red-600' : 'text-gray-900'
-                        }`}>
-                          {value.value} {value.unit}
-                        </p>
+        {(() => {
+          const results = parseAnalysisResults(analysis.results);
+          return results && Object.keys(results).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Результаты анализов</CardTitle>
+                <CardDescription>Показатели и их значения</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(results).map(([key, value]) => {
+                    if (!value) return null;
+                    
+                    return (
+                      <div
+                        key={key}
+                        className={`p-4 border rounded-lg ${
+                          value.normal === false ? 'border-red-200 bg-red-50' : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-semibold">{key}</h4>
+                            <p className={`text-lg font-medium ${
+                              value.normal === false ? 'text-red-600' : 'text-gray-900'
+                            }`}>
+                              {value.value} {value.unit}
+                            </p>
+                          </div>
+                          {value.normal === false && (
+                            <Badge className="bg-red-100 text-red-800">
+                              Отклонение
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      {value.normal === false && (
-                        <Badge className="bg-red-100 text-red-800">
-                          Отклонение
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
-        {/* Примечания */}
-        {analysis.notes && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Примечания</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 whitespace-pre-wrap">{analysis.notes}</p>
-            </CardContent>
-          </Card>
-        )}
+            {/* Примечания */}
+            {analysis.notes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Примечания</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {analysis.notes.split('--- AI Комментарии ---').map((section, index) => {
+                      if (index === 0 && section.trim()) {
+                        // Обычные примечания
+                        return (
+                          <div key="manual">
+                            <p className="text-gray-700 whitespace-pre-wrap">{section.trim()}</p>
+                          </div>
+                        )
+                      } else if (index === 1 && section.trim()) {
+                        // AI комментарии
+                        return (
+                          <div key="ai" className="p-3 border rounded-md bg-blue-50">
+                            <h4 className="font-semibold text-blue-800 mb-2">AI Комментарии</h4>
+                            <p className="text-gray-800 whitespace-pre-wrap">{section.trim()}</p>
+                          </div>
+                        )
+                      }
+                      return null
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
         {/* Метаинформация */}
         <Card>

@@ -15,6 +15,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<void>
   logout: () => void
   isLoading: boolean
+  token?: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [token, setToken] = useState<string | null>(null)
 
   useEffect(() => {
     // Проверка токена при загрузке
@@ -45,12 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
+        setToken(token)
       } else {
         Cookies.remove('token')
+        setToken(null)
       }
     } catch (error) {
       console.error('Auth check error:', error)
       Cookies.remove('token')
+      setToken(null)
     } finally {
       setIsLoading(false)
     }
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     Cookies.set('token', data.token, { expires: 7 })
     setUser(data.user)
+    setToken(data.token)
   }
 
   const register = async (email: string, password: string, name: string) => {
@@ -92,15 +98,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     Cookies.set('token', data.token, { expires: 7 })
     setUser(data.user)
+    setToken(data.token)
   }
 
   const logout = () => {
     Cookies.remove('token')
     setUser(null)
+    setToken(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading, token }}>
       {children}
     </AuthContext.Provider>
   )

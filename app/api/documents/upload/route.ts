@@ -179,6 +179,9 @@ async function processDocumentOCR(documentId: string) {
             parsed: true
           }
         })
+
+        // Сохраняем анализ как структурированную запись
+        await saveAnalysisFromDocument(documentId)
       } catch (e: any) {
         if (e?.code === 'P2025') {
           console.warn(`[OCR] Document ${documentId} was removed before update (real OCR). Skipping.`)
@@ -253,6 +256,7 @@ async function processDocumentOCR(documentId: string) {
                   parsed: true
                 }
               })
+              await saveAnalysisFromDocument(documentId)
               console.log(`[OCR] OpenAI Vision completed successfully for document ${documentId}`)
               return
             } catch (e: any) {
@@ -601,6 +605,7 @@ ${hasDeviations
 
     try {
       await prisma.document.update({ where: { id: documentId }, data: mockData })
+      await saveAnalysisFromDocument(documentId)
     } catch (e: any) {
       if (e?.code === 'P2025') {
         console.warn(`[OCR] Document ${documentId} was removed before update (mock). Skipping.`)
@@ -642,6 +647,41 @@ ${hasDeviations
       }
       throw e
     }
+  }
+}
+
+// Создать запись анализа из данных документа
+async function saveAnalysisFromDocument(documentId: string) {
+  try {
+    const doc = await prisma.document.findUnique({ where: { id: documentId } })
+    if (!doc || !doc.parsed) return
+
+    // Подготовка данных анализа
+    const indicators = Array.isArray(doc.indicators) ? doc.indicators : []
+    const hasDeviations = indicators.some((i: any) => i && i.isNormal === false)
+    const resultsPayload = {
+      indicators,
+      findings: doc.findings || null,
+      rawTextLength: (doc.rawText || '').length,
+    }
+
+    await prisma.analysis.create({
+      data: {
+        userId: doc.userId,
+        documentId: doc.id,
+        title: doc.studyType ? `Анализ: ${doc.studyType}` : doc.fileName,
+        type: doc.studyType || 'analysis',
+        date: doc.studyDate || doc.uploadDate || new Date(),
+        laboratory: doc.laboratory || undefined,
+        doctor: doc.doctor || undefined,
+        results: JSON.stringify(resultsPayload),
+        normalRange: undefined,
+        status: hasDeviations ? 'abnormal' : 'normal',
+        notes: doc.findings || undefined,
+      },
+    })
+  } catch (err) {
+    console.warn('[OCR] Failed to save analysis record:', err)
   }
 }
 

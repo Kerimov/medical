@@ -307,3 +307,121 @@ export function isAIParserAvailable(): boolean {
   return getAIConfig() !== null
 }
 
+/**
+ * Генерация интеллектуальных комментариев к результатам анализа
+ */
+export async function generateAnalysisComments(input: {
+  studyType?: string
+  date?: string
+  laboratory?: string
+  doctor?: string
+  indicators: Array<{
+    name: string
+    value: string | number
+    unit?: string
+    referenceMin?: number | null
+    referenceMax?: number | null
+    isNormal?: boolean | null
+  }>
+}): Promise<string> {
+  const config = getAIConfig()
+  if (!config) {
+    // Fallback: простая эвристика без AI
+    const abnormal = input.indicators.filter(i => i.isNormal === false)
+    if (abnormal.length === 0) {
+      return 'Все показатели в пределах референсных значений. Рекомендуется продолжать наблюдение согласно плановым осмотрам.'
+    }
+    const lines = abnormal.map(i => `• ${i.name}: значение ${i.value}${i.unit ? ' ' + i.unit : ''} вне референсных пределов${(i.referenceMin!=null||i.referenceMax!=null) ? ` (${i.referenceMin ?? '—'}–${i.referenceMax ?? '—'})` : ''}.`)
+    return [
+      'Обнаружены отклонения в следующих показателях:',
+      ...lines,
+      'Рекомендуется консультация профильного специалиста и повторный анализ через 1–3 месяца.'
+    ].join('\n')
+  }
+
+  const systemPrompt = `Ты — врач-консультант. По данным лабораторного анализа сформируй короткие клинические комментарии на русском языке (3–6 предложений):
+- Укажи какие показатели отклонены и почему это важно.
+- Сошлись на клинические рекомендации/Минздрава без указания года/ссылок.
+- Дай мягкие действия: повторный анализ, образ жизни, возможная консультация врача.
+- Без гипердиагностики и категоричных диагнозов. Без markdown.
+`
+
+  const userContent = JSON.stringify({
+    studyType: input.studyType,
+    date: input.date,
+    laboratory: input.laboratory,
+    doctor: input.doctor,
+    indicators: input.indicators
+  })
+
+  try {
+    switch (config.provider) {
+      case 'openai': {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey}`
+          },
+          body: JSON.stringify({
+            model: config.model || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Данные анализа (JSON):\n${userContent}` }
+            ],
+            temperature: 0.3
+          })
+        })
+        if (!response.ok) {
+          const err = await response.text()
+          throw new Error(`OpenAI error: ${response.status} ${err}`)
+        }
+        const json = await response.json()
+        return json.choices?.[0]?.message?.content?.trim() || 'Комментарий недоступен.'
+      }
+      case 'anthropic': {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': config.apiKey!,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: config.model || 'claude-3-5-sonnet-20241022',
+            max_tokens: 600,
+            temperature: 0.3,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: `Данные анализа (JSON):\n${userContent}` }]
+          })
+        })
+        if (!response.ok) {
+          const err = await response.text()
+          throw new Error(`Anthropic error: ${response.status} ${err}`)
+        }
+        const json = await response.json()
+        return json.content?.[0]?.text?.trim() || 'Комментарий недоступен.'
+      }
+      case 'local': {
+        const endpoint = process.env.LOCAL_LLM_ENDPOINT || 'http://localhost:11434'
+        const response = await fetch(`${endpoint}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: config.model || 'llama3.2',
+            prompt: `${systemPrompt}\n\nДанные анализа (JSON):\n${userContent}`,
+            stream: false
+          })
+        })
+        if (!response.ok) throw new Error(`Local LLM error: ${response.status}`)
+        const json = await response.json()
+        return (json.response || '').trim() || 'Комментарий недоступен.'
+      }
+      default:
+        return 'Комментарий недоступен.'
+    }
+  } catch (e) {
+    return 'Комментарий недоступен.'
+  }
+}
+

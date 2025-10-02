@@ -38,12 +38,15 @@ model Document {
   category      String?
   notes         String?
   indicators    Json?
+  analyses      Analysis[]
 }
 
 model Analysis {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId  String?  // Связанный документ (опционально)
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
   title       String
   type        String   // Тип анализа (общий анализ крови, биохимия, и т.д.)
   date        DateTime
