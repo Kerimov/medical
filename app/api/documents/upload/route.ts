@@ -665,7 +665,7 @@ async function saveAnalysisFromDocument(documentId: string) {
       rawTextLength: (doc.rawText || '').length,
     }
 
-    await prisma.analysis.create({
+    const analysis = await prisma.analysis.create({
       data: {
         userId: doc.userId,
         documentId: doc.id,
@@ -680,8 +680,93 @@ async function saveAnalysisFromDocument(documentId: string) {
         notes: doc.findings || undefined,
       },
     })
+
+    // Автоматически создаем напоминания если есть отклонения
+    if (hasDeviations && indicators.length > 0) {
+      try {
+        await generateRemindersFromAnalysis(analysis, indicators)
+      } catch (err) {
+        console.warn('[OCR] Failed to generate reminders:', err)
+      }
+    }
   } catch (err) {
     console.warn('[OCR] Failed to save analysis record:', err)
   }
+}
+
+async function generateRemindersFromAnalysis(analysis: any, indicators: any[]) {
+  const abnormalIndicators = indicators.filter(ind => ind.isNormal === false)
+  
+  if (abnormalIndicators.length === 0) {
+    return
+  }
+
+  const analysisType = analysis.type?.toLowerCase() || ''
+  const analysisTitle = analysis.title?.toLowerCase() || ''
+
+  // 1. Напоминание о консультации врача
+  const doctorReminder = {
+    userId: analysis.userId,
+    analysisId: analysis.id,
+    title: 'Консультация врача по результатам анализов',
+    description: `Рекомендуется консультация специалиста по результатам анализа "${analysis.title}". Обнаружены отклонения по показателям: ${abnormalIndicators.map(ind => ind.name).join(', ')}.`,
+    dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // через неделю
+    recurrence: 'NONE' as const,
+    channels: JSON.stringify(['EMAIL', 'PUSH'])
+  }
+  await prisma.reminder.create({ data: doctorReminder })
+
+  // 2. Специфичные напоминания в зависимости от типа анализа
+  if (analysisType.includes('кров') || analysisTitle.includes('кров')) {
+    const hasLowHemoglobin = abnormalIndicators.some(ind => 
+      ind.name?.toLowerCase().includes('гемоглобин') && ind.value < (ind.referenceMin || 120)
+    )
+    const hasHighCholesterol = abnormalIndicators.some(ind => 
+      ind.name?.toLowerCase().includes('холестерин') && ind.value > (ind.referenceMax || 5.2)
+    )
+
+    if (hasLowHemoglobin) {
+      await prisma.reminder.create({
+        data: {
+          userId: analysis.userId,
+          analysisId: analysis.id,
+          title: 'Прием препаратов железа',
+          description: 'Согласно результатам анализа крови, рекомендуется прием препаратов железа для повышения гемоглобина. Проконсультируйтесь с врачом о дозировке.',
+          dueAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // через 2 дня
+          recurrence: 'DAILY' as const,
+          channels: JSON.stringify(['PUSH'])
+        }
+      })
+    }
+
+    if (hasHighCholesterol) {
+      await prisma.reminder.create({
+        data: {
+          userId: analysis.userId,
+          analysisId: analysis.id,
+          title: 'Контроль питания и холестерина',
+          description: 'Обнаружен повышенный уровень холестерина. Рекомендуется диета с ограничением жирной пищи и регулярный контроль показателей.',
+          dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // через 3 дня
+          recurrence: 'WEEKLY' as const,
+          channels: JSON.stringify(['EMAIL', 'PUSH'])
+        }
+      })
+    }
+  }
+
+  // 3. Напоминание о повторном анализе
+  await prisma.reminder.create({
+    data: {
+      userId: analysis.userId,
+      analysisId: analysis.id,
+      title: 'Повторный анализ',
+      description: `Рекомендуется повторный анализ "${analysis.title}" через 1-3 месяца для контроля динамики показателей.`,
+      dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // через месяц
+      recurrence: 'NONE' as const,
+      channels: JSON.stringify(['EMAIL', 'PUSH'])
+    }
+  })
+
+  console.log(`[OCR] Generated reminders for analysis ${analysis.id} with ${abnormalIndicators.length} abnormal indicators`)
 }
 

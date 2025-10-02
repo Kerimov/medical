@@ -44,6 +44,14 @@ export default function RemindersPage() {
   const router = useRouter()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [newReminder, setNewReminder] = useState({
+    title: '',
+    description: '',
+    dueAt: '',
+    recurrence: 'NONE',
+    channels: ['EMAIL']
+  })
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -116,6 +124,45 @@ export default function RemindersPage() {
     }
   }
 
+  const createReminder = async () => {
+    if (!newReminder.title || !newReminder.dueAt) {
+      alert('Заполните обязательные поля: заголовок и дату')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const response = await fetch('/api/reminders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newReminder)
+      })
+
+      if (response.ok) {
+        setShowCreateModal(false)
+        setNewReminder({
+          title: '',
+          description: '',
+          dueAt: '',
+          recurrence: 'NONE',
+          channels: ['EMAIL']
+        })
+        fetchReminders() // Обновляем список
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Ошибка создания напоминания')
+      }
+    } catch (error) {
+      console.error('Ошибка создания напоминания:', error)
+      alert('Ошибка создания напоминания')
+    }
+  }
+
   const getRecurrenceLabel = (recurrence: string) => {
     switch (recurrence) {
       case 'DAILY': return 'Ежедневно'
@@ -163,7 +210,7 @@ export default function RemindersPage() {
             Управляйте своими медицинскими напоминаниями
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Добавить напоминание
         </Button>
@@ -331,12 +378,108 @@ export default function RemindersPage() {
             <p className="text-muted-foreground mb-4">
               Создайте свое первое напоминание для отслеживания важных медицинских событий
             </p>
-            <Button>
+            <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Добавить напоминание
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Модальное окно для создания напоминания */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-semibold mb-4">Создать напоминание</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Заголовок *</label>
+                <input
+                  type="text"
+                  value={newReminder.title}
+                  onChange={(e) => setNewReminder({...newReminder, title: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                  placeholder="Например: Прием лекарства"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Описание</label>
+                <textarea
+                  value={newReminder.description}
+                  onChange={(e) => setNewReminder({...newReminder, description: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                  rows={3}
+                  placeholder="Дополнительная информация"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Дата и время *</label>
+                <input
+                  type="datetime-local"
+                  value={newReminder.dueAt}
+                  onChange={(e) => setNewReminder({...newReminder, dueAt: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Повторение</label>
+                <select
+                  value={newReminder.recurrence}
+                  onChange={(e) => setNewReminder({...newReminder, recurrence: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="NONE">Однократно</option>
+                  <option value="DAILY">Ежедневно</option>
+                  <option value="WEEKLY">Еженедельно</option>
+                  <option value="MONTHLY">Ежемесячно</option>
+                  <option value="YEARLY">Ежегодно</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Каналы уведомлений</label>
+                <div className="space-y-2">
+                  {['EMAIL', 'PUSH', 'SMS'].map(channel => (
+                    <label key={channel} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={newReminder.channels.includes(channel)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewReminder({...newReminder, channels: [...newReminder.channels, channel]})
+                          } else {
+                            setNewReminder({...newReminder, channels: newReminder.channels.filter(c => c !== channel)})
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      {channel === 'EMAIL' && 'Email'}
+                      {channel === 'PUSH' && 'Push-уведомления'}
+                      {channel === 'SMS' && 'SMS'}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-6">
+              <Button onClick={createReminder} className="flex-1">
+                Создать
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1"
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -42,6 +42,7 @@ export default function AnalysisDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<string | null>(null)
+  const [generatingReminders, setGeneratingReminders] = useState(false)
 
   useEffect(() => {
     if (token && params.id) {
@@ -121,6 +122,28 @@ export default function AnalysisDetailPage() {
       setError(err instanceof Error ? err.message : 'Произошла ошибка')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleGenerateReminders = async () => {
+    if (!analysis) return
+    try {
+      setGeneratingReminders(true)
+      setError(null)
+      const res = await fetch(`/api/analyses/${analysis.id}/reminders`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Ошибка генерации напоминаний')
+      }
+      const data = await res.json()
+      alert(`Создано ${data.reminders?.length || 0} напоминаний на основе результатов анализа!`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Произошла ошибка')
+    } finally {
+      setGeneratingReminders(false)
     }
   }
 
@@ -244,6 +267,14 @@ export default function AnalysisDetailPage() {
           </Link>
           <Button size="sm" onClick={handleGenerate} disabled={generating}>
             {generating ? 'Генерация...' : 'Сгенерировать комментарии'}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={handleGenerateReminders} 
+            disabled={generatingReminders}
+          >
+            {generatingReminders ? 'Создание...' : 'Создать напоминания'}
           </Button>
           <Button
             variant="outline"
