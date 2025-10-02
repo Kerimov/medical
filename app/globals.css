@@ -4,48 +4,105 @@
 
 @layer base {
   :root {
+    /* Основные цвета */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
+    
+    /* Карточки */
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
+    
+    /* Поповеры */
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
+    
+    /* Медицинский синий - основной */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Мягкий зеленый - вторичный */
+    --secondary: 142 76% 36%;
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Приглушенные цвета */
+    --muted: 210 40% 98%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    
+    /* Коралловый акцент */
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Деструктивные действия */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Границы и инпуты */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 217 91% 60%;
+    
+    /* Радиус скругления */
+    --radius: 0.75rem;
+    
+    /* Медицинские цвета */
+    --medical-blue: 217 91% 60%;
+    --medical-green: 142 76% 36%;
+    --medical-coral: 24 95% 53%;
+    --medical-emerald: 158 64% 52%;
+    --medical-amber: 38 92% 50%;
+    --medical-red: 0 84% 60%;
+    
+    /* Градиенты */
+    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(142, 76%, 36%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(24, 95%, 53%) 0%, hsl(158, 64%, 52%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(142, 76%, 36%) 50%, hsl(24, 95%, 53%) 100%);
   }
 
   .dark {
+    /* Основные цвета для темной темы */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+    
+    /* Карточки */
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
+    
+    /* Поповеры */
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
+    
+    /* Медицинский синий - основной (ярче для темной темы) */
+    --primary: 217 91% 70%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    
+    /* Мягкий зеленый - вторичный */
+    --secondary: 142 76% 46%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    
+    /* Приглушенные цвета */
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    
+    /* Коралловый акцент */
+    --accent: 24 95% 63%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    /* Деструктивные действия */
+    --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
+    
+    /* Границы и инпуты */
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --ring: 217 91% 70%;
+    
+    /* Медицинские цвета для темной темы */
+    --medical-blue: 217 91% 70%;
+    --medical-green: 142 76% 46%;
+    --medical-coral: 24 95% 63%;
+    --medical-emerald: 158 64% 62%;
+    --medical-amber: 38 92% 60%;
+    --medical-red: 0 62.8% 50%;
   }
 }
 
@@ -54,7 +111,130 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  /* Медицинские градиенты */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  /* Медицинские цвета */
+  .text-medical-blue {
+    color: hsl(var(--medical-blue));
+  }
+  
+  .text-medical-green {
+    color: hsl(var(--medical-green));
+  }
+  
+  .text-medical-coral {
+    color: hsl(var(--medical-coral));
+  }
+  
+  .text-medical-emerald {
+    color: hsl(var(--medical-emerald));
+  }
+  
+  .text-medical-amber {
+    color: hsl(var(--medical-amber));
+  }
+  
+  .text-medical-red {
+    color: hsl(var(--medical-red));
+  }
+  
+  .bg-medical-blue {
+    background-color: hsl(var(--medical-blue));
+  }
+  
+  .bg-medical-green {
+    background-color: hsl(var(--medical-green));
+  }
+  
+  .bg-medical-coral {
+    background-color: hsl(var(--medical-coral));
+  }
+  
+  .bg-medical-emerald {
+    background-color: hsl(var(--medical-emerald));
+  }
+  
+  .bg-medical-amber {
+    background-color: hsl(var(--medical-amber));
+  }
+  
+  .bg-medical-red {
+    background-color: hsl(var(--medical-red));
+  }
+  
+  /* Современные эффекты */
+  .glass-effect {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+  
+  .glass-effect-dark {
+    @apply bg-gray-900/80 backdrop-blur-md border border-gray-700/20;
+  }
+  
+  .shadow-medical {
+    box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1), 0 10px 10px -5px rgba(37, 99, 235, 0.04);
+  }
+  
+  .shadow-medical-lg {
+    box-shadow: 0 25px 50px -12px rgba(37, 99, 235, 0.25);
+  }
+  
+  /* Анимации */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+  
+  .animate-pulse-soft {
+    animation: pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseSoft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
   }
 }
 

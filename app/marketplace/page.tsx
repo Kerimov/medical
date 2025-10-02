@@ -42,17 +42,17 @@ interface Recommendation {
 }
 
 const recommendationTypes = {
-  ANALYSIS: { label: 'Анализ', icon: TestTube, color: 'bg-blue-100 text-blue-800' },
-  SERVICE: { label: 'Услуга', icon: Heart, color: 'bg-red-100 text-red-800' },
-  SUPPLEMENT: { label: 'БАД', icon: Pill, color: 'bg-orange-100 text-orange-800' },
-  ARTICLE: { label: 'Статья', icon: AlertCircle, color: 'bg-yellow-100 text-yellow-800' },
-  PRODUCT: { label: 'Товар', icon: ShoppingBag, color: 'bg-purple-100 text-purple-800' }
+  ANALYSIS: { label: 'Анализ', icon: TestTube, color: 'bg-medical-blue/10 text-medical-blue border-medical-blue/20' },
+  SERVICE: { label: 'Услуга', icon: Heart, color: 'bg-medical-coral/10 text-medical-coral border-medical-coral/20' },
+  SUPPLEMENT: { label: 'БАД', icon: Pill, color: 'bg-medical-emerald/10 text-medical-emerald border-medical-emerald/20' },
+  ARTICLE: { label: 'Статья', icon: AlertCircle, color: 'bg-medical-amber/10 text-medical-amber border-medical-amber/20' },
+  PRODUCT: { label: 'Товар', icon: ShoppingBag, color: 'bg-medical-green/10 text-medical-green border-medical-green/20' }
 }
 
 const getPriorityColor = (priority: number) => {
-  if (priority >= 4) return 'bg-red-100 text-red-800 border-red-200'
-  if (priority >= 3) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-  return 'bg-green-100 text-green-800 border-green-200'
+  if (priority >= 4) return 'bg-medical-red/10 text-medical-red border-medical-red/20'
+  if (priority >= 3) return 'bg-medical-amber/10 text-medical-amber border-medical-amber/20'
+  return 'bg-medical-emerald/10 text-medical-emerald border-medical-emerald/20'
 }
 
 const getPriorityLabel = (priority: number) => {
@@ -182,53 +182,64 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Персональные рекомендации</h1>
-        <p className="text-gray-600">Рекомендации на основе ваших анализов и состояния здоровья</p>
-      </div>
-
-      {/* Фильтры и действия */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Тип рекомендации" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="ANALYSIS">Анализы</SelectItem>
-              <SelectItem value="SERVICE">Услуги</SelectItem>
-              <SelectItem value="SUPPLEMENT">БАД</SelectItem>
-              <SelectItem value="ARTICLE">Статьи</SelectItem>
-              <SelectItem value="PRODUCT">Товары</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Статус" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все статусы</SelectItem>
-              <SelectItem value="ACTIVE">Активные</SelectItem>
-              <SelectItem value="VIEWED">Просмотренные</SelectItem>
-              <SelectItem value="CLICKED">Открытые</SelectItem>
-              <SelectItem value="PURCHASED">Купленные</SelectItem>
-              <SelectItem value="DISMISSED">Отклоненные</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button 
-            onClick={generateRecommendations}
-            disabled={loading}
-            variant="outline"
-            className="w-full sm:w-auto"
-          >
-            {loading ? 'Генерация...' : 'Сгенерировать рекомендации'}
-          </Button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="mb-12 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-primary mb-6 shadow-medical">
+            <Heart className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+            Персональные рекомендации
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Умные рекомендации на основе ваших анализов и состояния здоровья, 
+            подобранные специально для вас
+          </p>
         </div>
-      </div>
+
+        {/* Фильтры и действия */}
+        <div className="mb-8">
+          <div className="glass-effect rounded-2xl p-6 shadow-medical">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full sm:w-48 border-0 bg-white/50">
+                  <SelectValue placeholder="Тип рекомендации" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все типы</SelectItem>
+                  <SelectItem value="ANALYSIS">Анализы</SelectItem>
+                  <SelectItem value="SERVICE">Услуги</SelectItem>
+                  <SelectItem value="SUPPLEMENT">БАД</SelectItem>
+                  <SelectItem value="ARTICLE">Статьи</SelectItem>
+                  <SelectItem value="PRODUCT">Товары</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full sm:w-48 border-0 bg-white/50">
+                  <SelectValue placeholder="Статус" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все статусы</SelectItem>
+                  <SelectItem value="ACTIVE">Активные</SelectItem>
+                  <SelectItem value="VIEWED">Просмотренные</SelectItem>
+                  <SelectItem value="CLICKED">Открытые</SelectItem>
+                  <SelectItem value="PURCHASED">Купленные</SelectItem>
+                  <SelectItem value="DISMISSED">Отклоненные</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button 
+                onClick={generateRecommendations}
+                disabled={loading}
+                className="w-full sm:w-auto gradient-primary text-white hover:opacity-90 transition-opacity"
+              >
+                {loading ? 'Генерация...' : 'Сгенерировать рекомендации'}
+              </Button>
+            </div>
+          </div>
+        </div>
 
       {/* Рекомендации */}
       {loading ? (
@@ -257,64 +268,64 @@ export default function MarketplacePage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {recommendations.map((recommendation) => {
             const typeInfo = recommendationTypes[recommendation.type]
             const IconComponent = typeInfo.icon
             
             return (
-              <Card key={recommendation.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${typeInfo.color}`}>
-                        <IconComponent className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{recommendation.title}</CardTitle>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className={typeInfo.color}>
-                            {typeInfo.label}
-                          </Badge>
-                          <Badge 
-                            variant="outline" 
-                            className={getPriorityColor(recommendation.priority)}
-                          >
-                            {getPriorityLabel(recommendation.priority)} приоритет
-                          </Badge>
-                        </div>
-                      </div>
+              <Card key={recommendation.id} className="group hover:shadow-medical-lg transition-all duration-300 border-0 shadow-medical glass-effect animate-fade-in">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-xl ${typeInfo.color} shadow-sm`}>
+                      <IconComponent className="w-6 h-6" />
                     </div>
                     {recommendation.company?.rating && (
                       <div className="flex items-center gap-1">
                         {renderStars(recommendation.company.rating)}
-                        <span className="text-sm text-gray-600 ml-1">
+                        <span className="text-sm text-muted-foreground ml-1">
                           ({recommendation.company.rating.toFixed(1)})
                         </span>
                       </div>
                     )}
                   </div>
+                  
+                  <CardTitle className="text-xl mb-3 group-hover:text-primary transition-colors">
+                    {recommendation.title}
+                  </CardTitle>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary" className={`${typeInfo.color} border`}>
+                      {typeInfo.label}
+                    </Badge>
+                    <Badge 
+                      variant="outline" 
+                      className={`${getPriorityColor(recommendation.priority)} border`}
+                    >
+                      {getPriorityLabel(recommendation.priority)} приоритет
+                    </Badge>
+                  </div>
                 </CardHeader>
                 
-                <CardContent>
-                  <div className="mb-4">
-                    <p className="text-gray-700 mb-2">{recommendation.description}</p>
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-sm text-blue-800">
+                <CardContent className="pt-0">
+                  <div className="mb-6">
+                    <p className="text-muted-foreground mb-4 leading-relaxed">{recommendation.description}</p>
+                    <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-xl border border-blue-100">
+                      <p className="text-sm text-blue-800 font-medium">
                         <strong>Причина рекомендации:</strong> {recommendation.reason}
                       </p>
                     </div>
                   </div>
 
                   {recommendation.company && (
-                    <div className="space-y-2 mb-4">
-                      <h4 className="text-sm font-medium">Рекомендуемая организация:</h4>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="font-medium">{recommendation.company.name}</h5>
+                    <div className="space-y-3 mb-6">
+                      <h4 className="text-sm font-semibold text-foreground">Рекомендуемая организация:</h4>
+                      <div className="bg-white/60 p-4 rounded-xl border border-gray-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="font-semibold text-lg">{recommendation.company.name}</h5>
                           {recommendation.company.isVerified && (
-                            <Badge variant="default" className="bg-green-600 text-white">
-                              Проверено
+                            <Badge className="bg-medical-emerald text-white border-0">
+                              ✓ Проверено
                             </Badge>
                           )}
                         </div>
@@ -374,15 +385,16 @@ export default function MarketplacePage() {
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-500">
-                      Создано: {new Date(recommendation.createdAt).toLocaleDateString('ru-RU')}
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(recommendation.createdAt).toLocaleDateString('ru-RU')}
                     </span>
                     <div className="flex gap-2">
                       {recommendation.status === 'ACTIVE' && (
                         <>
                           <Button 
                             size="sm" 
+                            className="gradient-primary text-white hover:opacity-90"
                             onClick={() => handleRecommendationAction(recommendation.id, 'view')}
                           >
                             Подробнее
@@ -390,6 +402,7 @@ export default function MarketplacePage() {
                           <Button 
                             size="sm" 
                             variant="outline"
+                            className="border-medical-red text-medical-red hover:bg-medical-red hover:text-white"
                             onClick={() => handleRecommendationAction(recommendation.id, 'dismiss')}
                           >
                             Отклонить
@@ -400,13 +413,16 @@ export default function MarketplacePage() {
                         <Button 
                           size="sm" 
                           variant="outline"
+                          className="border-medical-red text-medical-red hover:bg-medical-red hover:text-white"
                           onClick={() => handleRecommendationAction(recommendation.id, 'dismiss')}
                         >
                           Отклонить
                         </Button>
                       )}
                       {recommendation.status === 'DISMISSED' && (
-                        <span className="text-sm text-gray-500">Отклонено</span>
+                        <span className="text-sm text-muted-foreground px-3 py-1 bg-gray-100 rounded-full">
+                          Отклонено
+                        </span>
                       )}
                     </div>
                   </div>
@@ -417,18 +433,18 @@ export default function MarketplacePage() {
         </div>
       )}
 
-      {/* Кнопка "Показать больше" */}
-      {recommendations.length >= limit && (
-        <div className="flex justify-center mt-6">
-          <Button 
-            onClick={() => setLimit(prev => prev + 10)}
-            variant="outline"
-            className="px-8"
-          >
-            Показать больше рекомендаций
-          </Button>
-        </div>
-      )}
+        {/* Кнопка "Показать больше" */}
+        {recommendations.length >= limit && (
+          <div className="flex justify-center mt-12">
+            <Button 
+              onClick={() => setLimit(prev => prev + 10)}
+              className="px-8 py-3 gradient-secondary text-white hover:opacity-90 transition-opacity shadow-medical"
+            >
+              Показать больше рекомендаций
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

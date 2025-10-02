@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { Activity, Menu, User } from 'lucide-react'
+import { Menu, User, Bell, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { Logo, LogoCompact } from '@/components/Logo'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -18,58 +19,67 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full glass-effect border-b shadow-medical">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2">
-          <Activity className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl hidden sm:inline">Персональный Медицинский Ассистент</span>
-          <span className="font-bold text-xl sm:hidden">ПМА</span>
+        <Link href="/" className="flex items-center">
+          <Logo size="md" showText={false} />
+          <div className="ml-3 hidden sm:block">
+            <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+              Персональный Медицинский Ассистент
+            </span>
+          </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-          <Link href="/" className="transition-colors hover:text-primary">
+        <nav className="hidden md:flex items-center space-x-1 text-sm font-medium">
+          <Link href="/" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
             Главная
           </Link>
           {user && (
             <>
-              <Link href="/dashboard" className="transition-colors hover:text-primary">
+              <Link href="/dashboard" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Документы
               </Link>
-              <Link href="/analyses" className="transition-colors hover:text-primary">
+              <Link href="/analyses" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Анализы
               </Link>
-              <Link href="/reminders" className="transition-colors hover:text-primary">
+              <Link href="/reminders" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Напоминания
               </Link>
-              <Link href="/marketplace" className="transition-colors hover:text-primary">
+              <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Рекомендации
               </Link>
             </>
           )}
-          <Link href="/features" className="transition-colors hover:text-primary">
-            Возможности
-          </Link>
-          <Link href="/about" className="transition-colors hover:text-primary">
-            О нас
-          </Link>
-          <Link href="/contact" className="transition-colors hover:text-primary">
-            Контакты
-          </Link>
         </nav>
 
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:block"></div>
+        <div className="flex items-center space-x-3">
           {!isLoading && (
             user ? (
               <div className="hidden md:flex items-center gap-2">
+                {/* Уведомления */}
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-medical-coral rounded-full animate-pulse"></span>
+                </Button>
+                
+                {/* Настройки */}
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-5 w-5" />
+                </Button>
+                
+                {/* Личный кабинет */}
                 <Link href="/dashboard">
-                  <Button variant="default">
+                  <Button className="gradient-primary text-white hover:opacity-90 transition-opacity">
                     <User className="mr-2 h-4 w-4" />
                     Личный кабинет
                   </Button>
                 </Link>
-                <Button variant="outline" onClick={handleLogout}>Выйти</Button>
+                
+                {/* Выход */}
+                <Button variant="outline" onClick={handleLogout} className="border-medical-red text-medical-red hover:bg-medical-red hover:text-white">
+                  Выйти
+                </Button>
               </div>
             ) : (
               <>
@@ -79,7 +89,7 @@ export function Header() {
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button className="hidden md:inline-flex">
+                  <Button className="hidden md:inline-flex gradient-primary text-white hover:opacity-90">
                     Регистрация
                   </Button>
                 </Link>
@@ -101,55 +111,76 @@ export function Header() {
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t">
-          <nav className="container flex flex-col space-y-4 py-4">
-            <Link href="/" className="transition-colors hover:text-primary">
+        <div className="md:hidden border-t glass-effect">
+          <nav className="container flex flex-col space-y-2 py-4 animate-slide-up">
+            <Link 
+              href="/" 
+              className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+              onClick={() => setMobileMenuOpen(false)}
+            >
               Главная
             </Link>
-                {user && (
-                  <>
-                    <Link href="/dashboard" className="transition-colors hover:text-primary">
-                      Документы
-                    </Link>
-                    <Link href="/analyses" className="transition-colors hover:text-primary">
-                      Анализы
-                    </Link>
-                    <Link href="/reminders" className="transition-colors hover:text-primary">
-                      Напоминания
-                    </Link>
-                    <Link href="/marketplace" className="transition-colors hover:text-primary">
-                      Рекомендации
-                    </Link>
-                  </>
-                )}
-            <Link href="/features" className="transition-colors hover:text-primary">
-              Возможности
-            </Link>
-            <Link href="/about" className="transition-colors hover:text-primary">
-              О нас
-            </Link>
-            <Link href="/contact" className="transition-colors hover:text-primary">
-              Контакты
-            </Link>
-            <div className="flex flex-col space-y-2 pt-2">
+            {user && (
+              <>
+                <Link 
+                  href="/dashboard" 
+                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Документы
+                </Link>
+                <Link 
+                  href="/analyses" 
+                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Анализы
+                </Link>
+                <Link 
+                  href="/reminders" 
+                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Напоминания
+                </Link>
+                <Link 
+                  href="/marketplace" 
+                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Рекомендации
+                </Link>
+              </>
+            )}
+            
+            <div className="flex flex-col space-y-2 pt-4 border-t">
               {!isLoading && (
                 user ? (
-                  <Link href="/dashboard">
-                    <Button className="w-full">Личный кабинет</Button>
-                  </Link>
+                  <>
+                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                      <Button className="w-full gradient-primary text-white">
+                        <User className="mr-2 h-4 w-4" />
+                        Личный кабинет
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-medical-red text-medical-red hover:bg-medical-red hover:text-white" 
+                      onClick={handleLogout}
+                    >
+                      Выйти
+                    </Button>
+                  </>
                 ) : (
                   <>
-                    <Link href="/login">
+                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                       <Button variant="ghost" className="w-full">Войти</Button>
                     </Link>
-                    <Link href="/register">
-                      <Button className="w-full">Регистрация</Button>
+                    <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                      <Button className="w-full gradient-primary text-white">Регистрация</Button>
                     </Link>
                   </>
                 )
-              )}
-              {user && (
-                <Button variant="outline" className="w-full" onClick={handleLogout}>Выйти</Button>
               )}
             </div>
           </nav>
