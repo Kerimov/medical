@@ -18,6 +18,99 @@ model User {
   reminders Reminder[]
   reminderPreference ReminderPreference?
   recommendations Recommendation[]
+  doctorProfile DoctorProfile?
+  patientRecords PatientRecord[]
+}
+
+model DoctorProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber     String   @unique
+  specialization    String
+  experience        Int      // years
+  education         String
+  certifications    String?
+  phone             String?
+  clinic            String?
+  address           String?
+  workingHours      Json?    // {"monday": {"start": "09:00", "end": "18:00"}, ...}
+  consultationFee   Float?
+  isVerified        Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  patientRecords    PatientRecord[]
+  medicalNotes      MedicalNote[]
+  prescriptions     Prescription[]
+  appointments      Appointment[]
+}
+
+model PatientRecord {
+  id              String   @id @default(cuid())
+  doctorId        String
+  doctor          DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientId       String
+  patient         User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordType      String   // "consultation", "follow_up", "emergency", "routine"
+  diagnosis       String?
+  symptoms        String?
+  treatment       String?
+  medications     Json?    // [{"name": "Medication", "dosage": "500mg", "frequency": "2x daily"}]
+  nextVisit       DateTime?
+  status          String   @default("active") // "active", "completed", "cancelled"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  medicalNotes    MedicalNote[]
+  prescriptions   Prescription[]
+}
+
+model MedicalNote {
+  id              String   @id @default(cuid())
+  doctorId        String
+  doctor          DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientRecordId String?
+  patientRecord   PatientRecord? @relation(fields: [patientRecordId], references: [id], onDelete: Cascade)
+  title           String
+  content         String
+  noteType        String   // "observation", "recommendation", "warning", "follow_up"
+  priority        String   @default("normal") // "low", "normal", "high", "urgent"
+  isPrivate       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Prescription {
+  id              String   @id @default(cuid())
+  doctorId        String
+  doctor          DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientRecordId String?
+  patientRecord   PatientRecord? @relation(fields: [patientRecordId], references: [id], onDelete: Cascade)
+  medication      String
+  dosage          String
+  frequency       String
+  duration        String
+  instructions    String?
+  isActive        Boolean  @default(true)
+  prescribedAt    DateTime @default(now())
+  expiresAt       DateTime?
+}
+
+model Appointment {
+  id              String   @id @default(cuid())
+  doctorId        String
+  doctor          DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patientId       String
+  patientName     String
+  patientPhone    String?
+  patientEmail    String?
+  appointmentType String   // "consultation", "follow_up", "emergency", "routine"
+  scheduledAt     DateTime
+  duration        Int      @default(30) // minutes
+  status          String   @default("scheduled") // "scheduled", "confirmed", "completed", "cancelled", "no_show"
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Document {

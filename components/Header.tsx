@@ -1,17 +1,36 @@
 'use client'
 
 import Link from 'next/link'
-import { Menu, User, Bell, Settings, Shield } from 'lucide-react'
+import { Menu, User, Bell, Settings, Shield, Stethoscope } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Logo, LogoCompact } from '@/components/Logo'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isDoctor, setIsDoctor] = useState(false)
   const { user, isLoading, logout } = useAuth()
   const router = useRouter()
+
+  // Проверяем, является ли пользователь врачом
+  React.useEffect(() => {
+    if (user) {
+      checkDoctorStatus()
+    }
+  }, [user])
+
+  const checkDoctorStatus = async () => {
+    try {
+      const response = await fetch('/api/doctor/profile', {
+        credentials: 'include'
+      })
+      setIsDoctor(response.ok)
+    } catch (error) {
+      setIsDoctor(false)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -46,6 +65,12 @@ export function Header() {
               <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Рекомендации
               </Link>
+              {isDoctor && (
+                <Link href="/doctor" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
+                  <Stethoscope className="w-4 h-4" />
+                  Врач
+                </Link>
+              )}
               {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
                 <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
                   <Shield className="h-4 w-4" />
@@ -148,6 +173,16 @@ export function Header() {
                 >
                   Рекомендации
                 </Link>
+                {isDoctor && (
+                  <Link 
+                    href="/doctor" 
+                    className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Stethoscope className="h-4 w-4" />
+                    Врач
+                  </Link>
+                )}
                 <Link 
                   href="/reminders" 
                   className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
