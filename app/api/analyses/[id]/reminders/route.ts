@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
-import prisma from '@/lib/db'
+import { prisma } from '@/lib/db'
 
 // POST /api/analyses/[id]/reminders - создать напоминания на основе анализа
 export async function POST(
@@ -44,6 +44,11 @@ export async function POST(
     // Парсим результаты анализа
     let indicators: any[] = []
     try {
+      if (!analysis.results) {
+        console.log('Analysis has no results')
+        return NextResponse.json({ error: 'Анализ не содержит результатов' }, { status: 400 })
+      }
+      
       let results = analysis.results
       if (typeof results === 'string') {
         results = JSON.parse(results)

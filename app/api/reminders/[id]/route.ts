@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
-import prisma from '@/lib/db'
+import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
 // GET /api/reminders/[id] - получить конкретное напоминание

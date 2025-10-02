@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
-import prisma from '@/lib/db'
+import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
 // GET /api/reminders - получить все напоминания пользователя
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         document: true,
         deliveries: true
       },
-      orderBy: { dueDate: 'asc' }
+      orderBy: { dueAt: 'asc' }
     })
 
     return NextResponse.json(reminders)

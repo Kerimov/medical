@@ -26,7 +26,7 @@ interface Reminder {
   description?: string
   dueAt: string
   recurrence: string
-  channels: string
+  channels: string | string[]
   analysis?: {
     id: string
     title: string
@@ -75,7 +75,14 @@ export default function RemindersPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setReminders(data)
+        // Парсим channels если они приходят как строка JSON
+        const parsedData = data.map((reminder: any) => ({
+          ...reminder,
+          channels: typeof reminder.channels === 'string' 
+            ? JSON.parse(reminder.channels) 
+            : reminder.channels
+        }))
+        setReminders(parsedData)
       }
     } catch (error) {
       console.error('Ошибка загрузки напоминаний:', error)
@@ -285,6 +292,7 @@ export default function RemindersPage() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>Срок: {new Date(reminder.dueAt).toLocaleDateString('ru-RU')}</span>
                         <span>Повтор: {getRecurrenceLabel(reminder.recurrence)}</span>
+                        <span>Каналы: {Array.isArray(reminder.channels) ? reminder.channels.join(', ') : reminder.channels}</span>
                         {reminder.analysis && (
                           <Link href={`/analyses/${reminder.analysis.id}`} className="text-primary hover:underline">
                             Связанный анализ
@@ -337,6 +345,7 @@ export default function RemindersPage() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span>Срок: {new Date(reminder.dueAt).toLocaleDateString('ru-RU')}</span>
                         <span>Повтор: {getRecurrenceLabel(reminder.recurrence)}</span>
+                        <span>Каналы: {Array.isArray(reminder.channels) ? reminder.channels.join(', ') : reminder.channels}</span>
                         {reminder.analysis && (
                           <Link href={`/analyses/${reminder.analysis.id}`} className="text-primary hover:underline">
                             Связанный анализ
