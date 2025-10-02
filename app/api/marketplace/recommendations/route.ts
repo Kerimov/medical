@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyToken } from '@/lib/auth'
+import { prisma } from '@/lib/db'
+import { logger } from '@/lib/logger'
+
+// GET /api/marketplace/recommendations - получить персонализированные рекомендации
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!token) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    }
+
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type')
+    const status = searchParams.get('status') || 'ACTIVE'
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    const where: any = {
+      userId: decoded.userId,
+      status: status as any
+    }
+
+    if (type) {
+      where.type = type
+    }
+
+    const recommendations = await prisma.recommendation.findMany({
+      where,
+      include: {
+        company: true,
+        product: true,
+        analysis: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            date: true
+          }
+        },
+        _count: {
+          select: { interactions: true }
+        }
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'desc' }
+      ],
+      take: limit
+    })
+
+    return NextResponse.json(recommendations)
+  } catch (error) {
+    logger.error('Error fetching recommendations:', error)
+    return NextResponse.json({ error: 'Ошибка получения рекомендаций' }, { status: 500 })
+  }
+}
+
+// POST /api/marketplace/recommendations - создать новую рекомендацию
+export async function POST(request: NextRequest) {
+  try {
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!token) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    }
+
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const {
+      type,
+      title,
+      description,
+      reason,
+      priority = 1,
+      companyId,
+      productId,
+      analysisId,
+      metadata,
+      expiresAt
+    } = body
+
+    // Валидация
+    if (!type || !title) {
+      return NextResponse.json({ error: 'Тип и заголовок рекомендации обязательны' }, { status: 400 })
+    }
+
+    const recommendation = await prisma.recommendation.create({
+      data: {
+        userId: decoded.userId,
+        type,
+        title,
+        description,
+        reason,
+        priority,
+        companyId,
+        productId,
+        analysisId,
+        metadata: metadata ? JSON.stringify(metadata) : null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null
+      },
+      include: {
+        company: true,
+        product: true,
+        analysis: {
+          select: {
+            id: true,
+            title: true,
+            type: true
+          }
+        }
+      }
+    })
+
+    return NextResponse.json(recommendation, { status: 201 })
+  } catch (error) {
+    logger.error('Error creating recommendation:', error)
+    return NextResponse.json({ error: 'Ошибка создания рекомендации' }, { status: 500 })
+  }
+}

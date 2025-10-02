@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import { createRecommendationsForUser } from '@/lib/ai-recommendations'
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,6 +68,16 @@ export async function POST(request: NextRequest) {
         notes
       }
     })
+
+    // Генерируем рекомендации, если анализ имеет отклонения
+    if (status === 'abnormal') {
+      try {
+        await createRecommendationsForUser(payload.userId)
+      } catch (error) {
+        console.error('Error generating recommendations:', error)
+        // Не прерываем создание анализа из-за ошибки рекомендаций
+      }
+    }
 
     return NextResponse.json({
       message: 'Анализ успешно сохранен',

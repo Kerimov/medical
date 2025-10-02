@@ -42,6 +42,12 @@ export function Header() {
               <Link href="/reminders" className="transition-colors hover:text-primary">
                 Напоминания
               </Link>
+              <Link href="/marketplace" className="transition-colors hover:text-primary">
+                Маркетплейс
+              </Link>
+              <Link href="/marketplace/recommendations" className="transition-colors hover:text-primary">
+                Рекомендации
+              </Link>
             </>
           )}
           <Link href="/features" className="transition-colors hover:text-primary">
@@ -113,6 +119,12 @@ export function Header() {
                     </Link>
                     <Link href="/reminders" className="transition-colors hover:text-primary">
                       Напоминания
+                    </Link>
+                    <Link href="/marketplace" className="transition-colors hover:text-primary">
+                      Маркетплейс
+                    </Link>
+                    <Link href="/marketplace/recommendations" className="transition-colors hover:text-primary">
+                      Рекомендации
                     </Link>
                   </>
                 )}

@@ -17,6 +17,7 @@ model User {
   analyses  Analysis[]
   reminders Reminder[]
   reminderPreference ReminderPreference?
+  recommendations Recommendation[]
 }
 
 model Document {
@@ -62,6 +63,7 @@ model Analysis {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   reminders   Reminder[]
+  recommendations Recommendation[]
 }
 
 /// Напоминания и планирование
@@ -124,4 +126,104 @@ model ReminderDelivery {
   sentAt     DateTime?
   error      String?
   createdAt  DateTime        @default(now())
+}
+
+/// Маркетплейс и персонализированные предложения
+enum CompanyType {
+  CLINIC
+  LABORATORY
+  PHARMACY
+  HEALTH_STORE
+  FITNESS_CENTER
+  NUTRITIONIST
+  OTHER
+}
+
+enum RecommendationType {
+  ANALYSIS
+  SUPPLEMENT
+  SERVICE
+  ARTICLE
+  PRODUCT
+}
+
+enum RecommendationStatus {
+  ACTIVE
+  VIEWED
+  CLICKED
+  PURCHASED
+  DISMISSED
+}
+
+model Company {
+  id          String      @id @default(cuid())
+  name        String
+  type        CompanyType
+  description String?
+  address     String?
+  city        String?
+  phone       String?
+  email       String?
+  website     String?
+  rating      Float?      @default(0)
+  reviewCount Int         @default(0)
+  imageUrl    String?
+  services    Json?       // JSON массив услуг
+  workingHours Json?      // JSON с рабочими часами
+  coordinates Json?       // JSON с координатами {lat, lng}
+  isVerified  Boolean     @default(false)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  products    Product[]
+  recommendations Recommendation[]
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  category    String?
+  price       Float?
+  currency    String    @default("RUB")
+  imageUrl    String?
+  isAvailable Boolean   @default(true)
+  tags        Json?     // JSON массив тегов
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  recommendations Recommendation[]
+}
+
+model Recommendation {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            RecommendationType
+  title           String
+  description     String?
+  reason          String?            // Причина рекомендации (например, "Низкий уровень витамина D")
+  priority        Int                @default(1) // 1-5, где 5 - высший приоритет
+  status          RecommendationStatus @default(ACTIVE)
+  companyId       String?
+  company         Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  productId       String?
+  product         Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  analysisId      String?            // Связанный анализ, который вызвал рекомендацию
+  analysis        Analysis?          @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  metadata        Json?              // Дополнительные данные
+  expiresAt       DateTime?          // Дата истечения рекомендации
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  interactions    RecommendationInteraction[]
+}
+
+model RecommendationInteraction {
+  id               String         @id @default(cuid())
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  action           String         // "view", "click", "purchase", "dismiss"
+  metadata         Json?          // Дополнительные данные о взаимодействии
+  createdAt        DateTime       @default(now())
 }
