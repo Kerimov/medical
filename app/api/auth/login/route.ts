@@ -2,9 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { comparePasswords, generateToken } from '@/lib/auth'
 
+function tryParseBody(raw: string): { email?: string; password?: string } {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Try x-www-form-urlencoded
+    try {
+      const params = new URLSearchParams(raw)
+      return {
+        email: params.get('email') || undefined,
+        password: params.get('password') || undefined
+      }
+    } catch {
+      return {}
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const raw = await request.text()
+    const { email, password } = tryParseBody(raw)
 
     // Валидация
     if (!email || !password) {

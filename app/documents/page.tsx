@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,6 +46,8 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const pollTimersRef = useRef<Record<string, NodeJS.Timeout>>({})
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [dragActive, setDragActive] = useState(false)
@@ -64,6 +66,19 @@ export default function DocumentsPage() {
       if (response.ok) {
         const data = await response.json()
         setDocuments(data.documents)
+
+        // Автоподхват незавершённых распознаваний и запуск опроса
+        const pending = data.documents.filter((d: Document) => !d.parsed)
+        setProcessingIds((prev) => {
+          const next = new Set(prev)
+          for (const doc of pending) {
+            if (!next.has(doc.id) && !pollTimersRef.current[doc.id]) {
+              next.add(doc.id)
+              void pollDocument(doc.id)
+            }
+          }
+          return next
+        })
       }
     } catch (error) {
       console.error('Error loading documents:', error)
@@ -71,6 +86,44 @@ export default function DocumentsPage() {
       setIsLoading(false)
     }
   }
+
+  // Опрос одного документа до завершения распознавания
+  const pollDocument = async (id: string) => {
+    // Не запускаем второй раз для того же id
+    if (pollTimersRef.current[id]) return
+
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/documents/${id}`)
+        if (res.ok) {
+          const { document } = await res.json()
+          setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...document } : d)))
+          if (document.parsed) {
+            clearTimeout(pollTimersRef.current[id])
+            delete pollTimersRef.current[id]
+            setProcessingIds((prev) => {
+              const next = new Set(prev)
+              next.delete(id)
+              return next
+            })
+            return
+          }
+        }
+      } catch {}
+      // Повторить через 1.5 сек
+      pollTimersRef.current[id] = setTimeout(tick, 1500)
+    }
+
+    pollTimersRef.current[id] = setTimeout(tick, 1500)
+  }
+
+  // Очистка таймеров при размонтировании
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimersRef.current).forEach((t) => clearTimeout(t))
+      pollTimersRef.current = {}
+    }
+  }, [])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -113,7 +166,13 @@ export default function DocumentsPage() {
         })
 
         if (response.ok) {
+          const data = await response.json()
+          const newId = data?.document?.id as string | undefined
           await loadDocuments()
+          if (newId) {
+            setProcessingIds((prev) => new Set(prev).add(newId))
+            void pollDocument(newId)
+          }
         } else {
           const error = await response.json()
           alert(`Ошибка загрузки ${file.name}: ${error.error}`)
@@ -326,8 +385,10 @@ export default function DocumentsPage() {
                         </p>
                       </div>
                     </div>
-                    {doc.parsed && (
+                    {doc.parsed ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
                     )}
                   </div>
 
@@ -343,7 +404,7 @@ export default function DocumentsPage() {
                     </p>
                   )}
 
-                  {doc.ocrConfidence && (
+                  {doc.ocrConfidence && doc.parsed && (
                     <div className="mb-4">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className="text-muted-foreground">Распознано</span>
@@ -354,6 +415,18 @@ export default function DocumentsPage() {
                           className="bg-primary h-1.5 rounded-full transition-all"
                           style={{ width: `${doc.ocrConfidence * 100}%` }}
                         />
+                      </div>
+                    </div>
+                  )}
+
+                  {!doc.parsed && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">Распознаётся…</span>
+                        <span className="text-muted-foreground">ожидание</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                        <div className="h-1.5 bg-primary animate-[progress_1.2s_linear_infinite]" style={{ width: '40%' }} />
                       </div>
                     </div>
                   )}
