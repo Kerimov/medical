@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     try {
       const token = Cookies.get('token')
+      console.log('Checking auth, token from cookies:', token ? 'present' : 'missing')
+      
       if (!token) {
         setIsLoading(false)
         return
@@ -48,7 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json()
         setUser(data.user)
         setToken(token)
+        console.log('Auth successful, token set:', token ? 'present' : 'missing')
       } else {
+        console.log('Auth failed, removing token')
         Cookies.remove('token')
         setToken(null)
       }

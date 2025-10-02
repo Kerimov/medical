@@ -24,7 +24,7 @@ interface Analysis {
   date: string
   laboratory?: string
   doctor?: string
-  results: string // JSON string from API
+  results: string | object // JSON string or object from API
   normalRange?: string
   status: 'normal' | 'abnormal' | 'critical'
   notes?: string
@@ -126,10 +126,14 @@ export default function AnalysisDetailPage() {
   }
 
   const handleGenerateReminders = async () => {
-    if (!analysis) return
+    if (!analysis || !token) {
+      console.log('Missing analysis or token:', { analysis: !!analysis, token: !!token })
+      return
+    }
     try {
       setGeneratingReminders(true)
       setError(null)
+      console.log('Sending request with token:', token ? 'present' : 'missing')
       const res = await fetch(`/api/analyses/${analysis.id}/reminders`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -181,11 +185,16 @@ export default function AnalysisDetailPage() {
     })
   }
 
-  const parseAnalysisResults = (resultsString: string): AnalysisResult => {
+  const parseAnalysisResults = (resultsString: string | object): AnalysisResult => {
     try {
-      const parsed = JSON.parse(resultsString)
+      // Если это уже объект, используем его напрямую
+      let parsed = resultsString
+      if (typeof resultsString === 'string') {
+        parsed = JSON.parse(resultsString)
+      }
+      
       // Если это объект с indicators, извлекаем их
-      if (parsed.indicators && Array.isArray(parsed.indicators)) {
+      if (parsed && typeof parsed === 'object' && 'indicators' in parsed && Array.isArray(parsed.indicators)) {
         const result: AnalysisResult = {}
         parsed.indicators.forEach((indicator: any) => {
           if (indicator.name) {
@@ -199,7 +208,7 @@ export default function AnalysisDetailPage() {
         return result
       }
       // Если это уже готовый объект результатов
-      return parsed
+      return parsed as AnalysisResult
     } catch (error) {
       console.error('Error parsing analysis results:', error)
       return {}

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import prisma from '@/lib/db'
-import { logger } from '@/lib/logger'
 
 // POST /api/analyses/[id]/reminders - создать напоминания на основе анализа
 export async function POST(
@@ -9,32 +8,64 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+    const authHeader = request.headers.get('Authorization')
+    console.log('Authorization header:', authHeader)
+    
+    const token = authHeader?.replace('Bearer ', '')
+    console.log('Extracted token:', token ? 'present' : 'missing')
+    
     if (!token) {
+      console.log('No token provided')
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
 
     const decoded = verifyToken(token)
+    console.log('Token verification result:', decoded ? 'valid' : 'invalid')
+    
     if (!decoded) {
+      console.log('Invalid token provided')
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
     }
 
     const analysisId = params.id
+    console.log('Looking for analysis:', analysisId, 'for user:', decoded.userId)
+    
     const analysis = await prisma.analysis.findUnique({
       where: { id: analysisId, userId: decoded.userId },
     })
 
     if (!analysis) {
+      console.log('Analysis not found:', analysisId)
       return NextResponse.json({ error: 'Анализ не найден' }, { status: 404 })
     }
+    
+    console.log('Analysis found:', analysis.id, analysis.title)
 
     // Парсим результаты анализа
     let indicators: any[] = []
     try {
-      const results = JSON.parse(analysis.results)
-      indicators = results.indicators || results || []
+      let results = analysis.results
+      if (typeof results === 'string') {
+        results = JSON.parse(results)
+      }
+      
+      console.log('Analysis results:', JSON.stringify(results, null, 2))
+
+      // Проверяем различные структуры данных
+      if (results && typeof results === 'object') {
+        if (Array.isArray(results.indicators)) {
+          indicators = results.indicators
+        } else if (Array.isArray(results)) {
+          indicators = results
+        } else if (results.indicators && typeof results.indicators === 'object') {
+          // Если indicators это объект, преобразуем в массив
+          indicators = Object.values(results.indicators)
+        }
+      }
+
+      console.log('Extracted indicators:', JSON.stringify(indicators, null, 2))
     } catch (error) {
-      logger.error('Error parsing analysis results:', error)
+      console.log('Error parsing analysis results:', error)
       return NextResponse.json({ error: 'Ошибка парсинга результатов анализа' }, { status: 400 })
     }
 
@@ -43,36 +74,52 @@ export async function POST(
     
     // Создаем напоминания в базе данных
     const createdReminders = []
-    for (const reminderData of reminders) {
-      const reminder = await prisma.reminder.create({
-        data: {
-          userId: decoded.userId,
-          analysisId: analysisId,
-          title: reminderData.title,
-          description: reminderData.description,
-          dueAt: reminderData.dueAt,
-          recurrence: reminderData.recurrence,
-          channels: JSON.stringify(reminderData.channels)
-        }
-      })
-      createdReminders.push(reminder)
+    try {
+      for (const reminderData of reminders) {
+        console.log('Creating reminder:', JSON.stringify(reminderData, null, 2))
+        const reminder = await prisma.reminder.create({
+          data: {
+            userId: decoded.userId,
+            analysisId: analysisId,
+            title: reminderData.title,
+            description: reminderData.description,
+            dueAt: reminderData.dueAt,
+            recurrence: reminderData.recurrence,
+            channels: JSON.stringify(reminderData.channels)
+          }
+        })
+        createdReminders.push(reminder)
+        console.log('Reminder created successfully:', reminder.id)
+      }
+    } catch (dbError) {
+      console.log('Database error creating reminders:', dbError)
+      return NextResponse.json({ error: 'Ошибка создания напоминаний в базе данных' }, { status: 500 })
     }
 
-    logger.info(`Created ${createdReminders.length} reminders for analysis ${analysisId}`)
+    console.log(`Created ${createdReminders.length} reminders for analysis ${analysisId}`)
     return NextResponse.json({ 
       message: `Создано ${createdReminders.length} напоминаний`,
       reminders: createdReminders 
     })
 
   } catch (error) {
-    logger.error('Error creating reminders from analysis:', error)
+    console.log('Error creating reminders from analysis:', error)
     return NextResponse.json({ error: 'Ошибка создания напоминаний' }, { status: 500 })
   }
 }
 
 function generateRemindersFromAnalysis(analysis: any, indicators: any[]): any[] {
   const reminders: any[] = []
-  const abnormalIndicators = indicators.filter(ind => ind.isNormal === false)
+  
+  // Убеждаемся, что indicators это массив
+  if (!Array.isArray(indicators)) {
+    console.log('Indicators is not an array:', indicators)
+    return reminders
+  }
+
+  const abnormalIndicators = indicators.filter(ind => ind && ind.isNormal === false)
+
+  console.log(`Found ${abnormalIndicators.length} abnormal indicators out of ${indicators.length} total`)
   
   if (abnormalIndicators.length === 0) {
     return reminders

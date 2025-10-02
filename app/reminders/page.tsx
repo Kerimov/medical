@@ -40,7 +40,7 @@ interface Reminder {
 }
 
 export default function RemindersPage() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, token } = useAuth()
   const router = useRouter()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,14 +60,13 @@ export default function RemindersPage() {
   }, [user, isLoading, router])
 
   useEffect(() => {
-    if (user) {
+    if (user && token) {
       fetchReminders()
     }
-  }, [user])
+  }, [user, token])
 
   const fetchReminders = async () => {
     try {
-      const token = localStorage.getItem('token')
       if (!token) return
 
       const response = await fetch('/api/reminders', {
@@ -87,7 +86,6 @@ export default function RemindersPage() {
 
   const markAsCompleted = async (reminderId: string) => {
     try {
-      const token = localStorage.getItem('token')
       if (!token) return
 
       // Удаляем напоминание при выполнении (так как в схеме нет поля isCompleted)
@@ -108,7 +106,6 @@ export default function RemindersPage() {
     if (!confirm('Вы уверены, что хотите удалить это напоминание?')) return
 
     try {
-      const token = localStorage.getItem('token')
       if (!token) return
 
       const response = await fetch(`/api/reminders/${reminderId}`, {
@@ -131,7 +128,6 @@ export default function RemindersPage() {
     }
 
     try {
-      const token = localStorage.getItem('token')
       if (!token) return
 
       const response = await fetch('/api/reminders', {
