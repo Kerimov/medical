@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { AIChat } from '@/components/AIChat'
@@ -22,12 +23,41 @@ import Link from 'next/link'
 export default function DashboardPage() {
   const { user, logout, isLoading } = useAuth()
   const router = useRouter()
+  const [adminUsers, setAdminUsers] = useState<any[]>([])
+  const [adminDocs, setAdminDocs] = useState<any[]>([])
+  const [adminLoading, setAdminLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login')
     }
   }, [user, isLoading, router])
+
+  useEffect(() => {
+    const run = async () => {
+      if (!user) return
+      try {
+        setAdminLoading(true)
+        // Берем токен из localStorage, если сохранен после логина
+        const token = localStorage.getItem('token')
+        if (!token) {
+          setAdminLoading(false)
+          return
+        }
+        const res = await fetch('/api/analytics', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setAdminUsers(data.users)
+          setAdminDocs(data.documents)
+        }
+      } finally {
+        setAdminLoading(false)
+      }
+    }
+    run()
+  }, [user])
 
   if (isLoading) {
     return (
@@ -217,6 +247,78 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <Button className="w-full">Настройки</Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Admin (read-only) */}
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Админ: Пользователи (read-only)</CardTitle>
+              <CardDescription>Доступно только при авторизации</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {adminLoading ? (
+                <div className="text-sm text-muted-foreground">Загрузка...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Имя</TableHead>
+                      <TableHead>Создан</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adminUsers.map(u => (
+                      <TableRow key={u.id}>
+                        <TableCell>{u.email}</TableCell>
+                        <TableCell>{u.name}</TableCell>
+                        <TableCell>{new Date(u.createdAt).toLocaleString('ru-RU')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Админ: Документы (read-only)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {adminLoading ? (
+                <div className="text-sm text-muted-foreground">Загрузка...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Файл</TableHead>
+                      <TableHead>Тип</TableHead>
+                      <TableHead>Размер</TableHead>
+                      <TableHead>Пользователь</TableHead>
+                      <TableHead>Дата</TableHead>
+                      <TableHead>Статус</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adminDocs.map(d => (
+                      <TableRow key={d.id}>
+                        <TableCell>{d.fileName}</TableCell>
+                        <TableCell>{d.fileType}</TableCell>
+                        <TableCell>{(d.fileSize/1024).toFixed(1)} KB</TableCell>
+                        <TableCell>{d.userId}</TableCell>
+                        <TableCell>{new Date(d.uploadDate).toLocaleString('ru-RU')}</TableCell>
+                        <TableCell>{d.parsed ? 'Обработан' : 'Новый'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>

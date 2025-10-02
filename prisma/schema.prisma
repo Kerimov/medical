@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./prisma/dev.db"
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  createdAt DateTime  @default(now())
+  documents Document[]
+}
+
+model Document {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  fileType      String
+  fileSize      Int
+  fileUrl       String
+  uploadDate    DateTime  @default(now())
+  parsed        Boolean   @default(false)
+  studyDate     DateTime?
+  studyType     String?
+  laboratory    String?
+  doctor        String?
+  findings      String?
+  rawText       String?
+  ocrConfidence Float?
+  tags          String?
+  category      String?
+  notes         String?
+}

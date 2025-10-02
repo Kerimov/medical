@@ -25,7 +25,8 @@ import {
   XCircle,
   Loader2,
   Download,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -56,6 +57,7 @@ interface Document {
 
 export default function DocumentViewPage() {
   const { user, isLoading: authLoading } = useAuth()
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const params = useParams()
   const [document, setDocument] = useState<Document | null>(null)
@@ -482,6 +484,28 @@ export default function DocumentViewPage() {
                 Закрыть
               </Button>
             </Link>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              disabled={isDeleting}
+              onClick={async () => {
+                if (!confirm('Удалить документ?')) return
+                try {
+                  setIsDeleting(true)
+                  const res = await fetch(`/api/documents/${document.id}`, { method: 'DELETE' })
+                  if (res.ok) {
+                    router.push('/documents')
+                  }
+                } catch (e) {
+                  console.error('Delete document error', e)
+                } finally {
+                  setIsDeleting(false)
+                }
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Удалить
+            </Button>
           </div>
         </div>
       </main>

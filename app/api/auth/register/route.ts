@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { prisma } from '@/lib/db'
 import { hashPassword, generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверка существования пользователя
-    const existingUser = db.users.findByEmail(email)
+    const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
       return NextResponse.json(
         { error: 'Пользователь с таким email уже существует' },
@@ -34,14 +34,9 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password)
 
     // Создание пользователя
-    const user = db.users.create({
-      email,
-      password: hashedPassword,
-      name
-    })
+    const user = await prisma.user.create({ data: { email, password: hashedPassword, name } })
 
     console.log('User registered:', email)
-    console.log('Total users in DB:', db.users.getAll().length)
 
     // Генерация токена
     const token = generateToken({

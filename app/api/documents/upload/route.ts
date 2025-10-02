@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { documentsDb, DocumentCategory } from '@/lib/documents'
+import { DocumentCategory } from '@/lib/documents'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
@@ -79,14 +80,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Создаем документ
-    const document = documentsDb.create({
-      userId: payload.userId,
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      fileUrl,
-      parsed: false,
-      category
+    const document = await prisma.document.create({
+      data: {
+        userId: payload.userId,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        fileUrl,
+        parsed: false,
+        category
+      }
     })
 
     // Запускаем асинхронную обработку OCR (не блокируем ответ)
@@ -118,7 +121,7 @@ export async function POST(request: NextRequest) {
 async function processDocumentOCR(documentId: string) {
   console.log(`[OCR] Starting processing for document ${documentId}`)
   
-  const document = documentsDb.findById(documentId)
+  const document = await prisma.document.findUnique({ where: { id: documentId } })
   if (!document) return
 
   try {
@@ -161,16 +164,18 @@ async function processDocumentOCR(documentId: string) {
         medicalData = parseMedicalData(ocrResult.text)
       }
       
-      documentsDb.update(documentId, {
-        rawText: ocrResult.text,
-        ocrConfidence: ocrResult.confidence,
-        studyType: medicalData.studyType,
-        studyDate: medicalData.studyDate,
-        laboratory: medicalData.laboratory,
-        doctor: medicalData.doctor,
-        findings: medicalData.findings,
-        indicators: medicalData.indicators,
-        parsed: true
+      await prisma.document.update({
+        where: { id: documentId },
+        data: {
+          rawText: ocrResult.text,
+          ocrConfidence: ocrResult.confidence,
+          studyType: medicalData.studyType,
+          studyDate: medicalData.studyDate,
+          laboratory: medicalData.laboratory,
+          doctor: medicalData.doctor,
+          findings: medicalData.findings,
+          parsed: true
+        }
       })
       
       console.log(`[OCR] OCR.space completed successfully for document ${documentId}`)
@@ -509,7 +514,7 @@ ${hasDeviations
       ]
     }
 
-    documentsDb.update(documentId, mockData)
+    await prisma.document.update({ where: { id: documentId }, data: mockData })
     console.log(`[OCR] Processing completed for document ${documentId}`)
     
     /* Для продакшена - интеграция с Google Cloud Vision:
@@ -535,10 +540,7 @@ ${hasDeviations
     
   } catch (error) {
     console.error(`[OCR] Error processing document ${documentId}:`, error)
-    documentsDb.update(documentId, {
-      parsed: false,
-      ocrConfidence: 0
-    })
+    await prisma.document.update({ where: { id: documentId }, data: { parsed: false, ocrConfidence: 0 } })
   }
 }
 

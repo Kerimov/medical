@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { documentsDb } from '@/lib/documents'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
@@ -22,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
     }
 
-    const document = documentsDb.findById(params.id)
+    const document = await prisma.document.findUnique({ where: { id: params.id } })
     
     if (!document) {
       return NextResponse.json({ error: 'Документ не найден' }, { status: 404 })
@@ -71,13 +71,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
     }
 
-    const deleted = documentsDb.delete(params.id)
-    
-    if (deleted) {
-      return NextResponse.json({ message: 'Документ удален' })
-    } else {
-      return NextResponse.json({ error: 'Ошибка удаления' }, { status: 500 })
-    }
+    await prisma.document.delete({ where: { id: params.id } })
+    return NextResponse.json({ message: 'Документ удален' })
   } catch (error) {
     console.error('Delete document error:', error)
     return NextResponse.json(
@@ -106,7 +101,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
     }
 
-    const document = documentsDb.findById(params.id)
+    const document = await prisma.document.findUnique({ where: { id: params.id } })
     
     if (!document) {
       return NextResponse.json({ error: 'Документ не найден' }, { status: 404 })
@@ -117,8 +112,7 @@ export async function PATCH(
     }
 
     const updates = await request.json()
-    const updated = documentsDb.update(params.id, updates)
-
+    const updated = await prisma.document.update({ where: { id: params.id }, data: updates })
     return NextResponse.json({ document: updated })
   } catch (error) {
     console.error('Update document error:', error)

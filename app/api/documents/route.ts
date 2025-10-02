@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { documentsDb } from '@/lib/documents'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
@@ -25,16 +25,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Получаем документы пользователя
-    const documents = documentsDb.findByUserId(payload.userId)
-
-    return NextResponse.json({
-      documents: documents.map(doc => ({
-        ...doc,
-        // Не отправляем сырой текст для экономии трафика
-        rawText: undefined
-      }))
+    const documents = await prisma.document.findMany({
+      where: { userId: payload.userId },
+      orderBy: { uploadDate: 'desc' }
     })
+
+    return NextResponse.json({ documents })
   } catch (error) {
     console.error('Get documents error:', error)
     return NextResponse.json(

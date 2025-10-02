@@ -5,6 +5,7 @@ import { Activity, Menu, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { ParserStatusBadge } from '@/components/parser-status-badge'
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -36,6 +37,9 @@ export function Header() {
         </nav>
 
         <div className="flex items-center space-x-4">
+          <div className="hidden md:block">
+            <ParserStatusBadge />
+          </div>
           {!isLoading && (
             user ? (
               <Link href="/dashboard">
@@ -89,6 +93,7 @@ export function Header() {
               Контакты
             </Link>
             <div className="flex flex-col space-y-2 pt-2">
+              <ParserStatusBadge />
               {!isLoading && (
                 user ? (
                   <Link href="/dashboard">

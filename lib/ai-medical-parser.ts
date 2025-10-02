@@ -12,6 +12,7 @@
  */
 
 import { MedicalData } from './ocr'
+import { logger } from './logger'
 
 interface AIParserConfig {
   provider: 'openai' | 'anthropic' | 'local'
@@ -83,8 +84,7 @@ export async function parseWithAI(
   ocrText: string,
   config: AIParserConfig
 ): Promise<MedicalData> {
-  console.log('[AI-PARSER] Starting AI-powered medical data extraction...')
-  console.log(`[AI-PARSER] Provider: ${config.provider}, Model: ${config.model || 'default'}`)
+  logger.info('Starting AI-powered medical data extraction', 'AI-PARSER', { provider: config.provider, model: config.model || 'default' })
   
   try {
     let response: string
@@ -119,13 +119,12 @@ export async function parseWithAI(
       indicators: data.indicators || []
     }
     
-    console.log(`[AI-PARSER] ✅ Successfully extracted ${medicalData.indicators.length} indicators`)
-    console.log(`[AI-PARSER] Study: ${medicalData.studyType}`)
+    logger.info('Successfully extracted indicators', 'AI-PARSER', { count: medicalData.indicators.length, studyType: medicalData.studyType })
     
     return medicalData
     
   } catch (error) {
-    console.error('[AI-PARSER] ❌ Error:', error)
+    logger.error('AI parser error', 'AI-PARSER', error)
     throw error
   }
 }
@@ -143,7 +142,7 @@ async function parseWithOpenAI(
   
   const model = config.model || 'gpt-4o-mini' // Используем более дешевую модель
   
-  console.log(`[AI-PARSER] Calling OpenAI API (model: ${model})...`)
+  logger.info('Calling OpenAI API', 'AI-PARSER', { model })
   
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -176,7 +175,7 @@ async function parseWithOpenAI(
   const result = await response.json()
   const content = result.choices[0].message.content
   
-  console.log('[AI-PARSER] OpenAI response received')
+  logger.info('OpenAI response received', 'AI-PARSER')
   return content
 }
 
@@ -193,7 +192,7 @@ async function parseWithClaude(
   
   const model = config.model || 'claude-3-5-sonnet-20241022'
   
-  console.log(`[AI-PARSER] Calling Anthropic API (model: ${model})...`)
+  logger.info('Calling Anthropic API', 'AI-PARSER', { model })
   
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -224,7 +223,7 @@ async function parseWithClaude(
   const result = await response.json()
   const content = result.content[0].text
   
-  console.log('[AI-PARSER] Claude response received')
+  logger.info('Claude response received', 'AI-PARSER')
   
   // Claude может вернуть текст с ```json, нужно извлечь JSON
   const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -245,7 +244,7 @@ async function parseWithLocalModel(
   const model = config.model || 'llama3.2'
   const endpoint = process.env.LOCAL_LLM_ENDPOINT || 'http://localhost:11434'
   
-  console.log(`[AI-PARSER] Calling local LLM (model: ${model})...`)
+  logger.info('Calling local LLM', 'AI-PARSER', { model })
   
   const response = await fetch(`${endpoint}/api/generate`, {
     method: 'POST',
@@ -265,7 +264,7 @@ async function parseWithLocalModel(
   }
   
   const result = await response.json()
-  console.log('[AI-PARSER] Local LLM response received')
+  logger.info('Local LLM response received', 'AI-PARSER')
   
   return result.response
 }
@@ -275,7 +274,6 @@ async function parseWithLocalModel(
  */
 export function getAIConfig(): AIParserConfig | null {
   // Приоритет: OpenAI > Anthropic > Local
-  
   if (process.env.OPENAI_API_KEY) {
     return {
       provider: 'openai',
