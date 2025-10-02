@@ -81,65 +81,76 @@ export default function DashboardPage() {
       {/* Main Content (глобальный Header уже в layout) */}
       <main className="container py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full gradient-primary mb-6 shadow-medical">
+            <Activity className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
             Добро пожаловать, {user.name.split(' ')[0]}!
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Управляйте своим здоровьем легко и эффективно
           </p>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Сегодня</p>
-                  <p className="text-2xl font-bold">3/5</p>
-                  <p className="text-xs text-muted-foreground">Лекарства</p>
+                  <p className="text-sm text-muted-foreground mb-1">Сегодня</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">3/5</p>
+                  <p className="text-xs text-muted-foreground mt-1">Лекарства</p>
                 </div>
-                <Pill className="h-8 w-8 text-primary" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <Pill className="h-8 w-8 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Ближайший</p>
-                  <p className="text-2xl font-bold">15:30</p>
-                  <p className="text-xs text-muted-foreground">Прием</p>
+                  <p className="text-sm text-muted-foreground mb-1">Ближайший</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">15:30</p>
+                  <p className="text-xs text-muted-foreground mt-1">Прием</p>
                 </div>
-                <Calendar className="h-8 w-8 text-primary" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <Calendar className="h-8 w-8 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Пульс</p>
-                  <p className="text-2xl font-bold">72</p>
-                  <p className="text-xs text-muted-foreground">уд/мин</p>
+                  <p className="text-sm text-muted-foreground mb-1">Пульс</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">72</p>
+                  <p className="text-xs text-muted-foreground mt-1">уд/мин</p>
                 </div>
-                <Heart className="h-8 w-8 text-primary" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <Heart className="h-8 w-8 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Записей</p>
-                  <p className="text-2xl font-bold">12</p>
-                  <p className="text-xs text-muted-foreground">В дневнике</p>
+                  <p className="text-sm text-muted-foreground mb-1">Записей</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">12</p>
+                  <p className="text-xs text-muted-foreground mt-1">В дневнике</p>
                 </div>
-                <FileText className="h-8 w-8 text-primary" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <FileText className="h-8 w-8 text-primary" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -147,100 +158,149 @@ export default function DashboardPage() {
 
         {/* Main Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Link href="/reminders" className="block">
-            <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
-              <CardHeader>
-                <Bell className="h-10 w-10 text-primary mb-3" />
-                <CardTitle>Напоминания</CardTitle>
-                <CardDescription>
+          <Link href="/reminders" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <Bell className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="w-2 h-2 bg-medical-coral rounded-full animate-pulse"></div>
+                </div>
+                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Напоминания</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
                   Настройте напоминания о приеме лекарств
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button className="w-full">Управлять</Button>
+              <CardContent className="pt-0">
+                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                  Управлять
+                </Button>
               </CardContent>
             </Card>
           </Link>
 
-          <Link href="/analyses" className="block">
-            <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
-              <CardHeader>
-                <TrendingUp className="h-10 w-10 text-primary mb-3" />
-                <CardTitle>Анализы</CardTitle>
-                <CardDescription>
+          <Link href="/analyses" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="w-2 h-2 bg-medical-emerald rounded-full"></div>
+                </div>
+                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Анализы</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
                   Просматривайте результаты ваших анализов
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button className="w-full">Открыть</Button>
+              <CardContent className="pt-0">
+                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                  Открыть
+                </Button>
               </CardContent>
             </Card>
           </Link>
 
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <Calendar className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Записи к врачам</CardTitle>
-              <CardDescription>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <Calendar className="h-8 w-8 text-primary" />
+                </div>
+                <div className="w-2 h-2 bg-medical-amber rounded-full"></div>
+              </div>
+              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Записи к врачам</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
                 Планируйте визиты и отслеживайте приемы
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button className="w-full">Открыть</Button>
+            <CardContent className="pt-0">
+              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                Открыть
+              </Button>
             </CardContent>
           </Card>
 
-            <Link href="/documents" className="block">
-              <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <FileText className="h-10 w-10 text-primary mb-3" />
-                  <CardTitle>Документы</CardTitle>
-                  <CardDescription>
-                    Храните анализы и медицинские документы
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full">Открыть</Button>
-                </CardContent>
-              </Card>
-            </Link>
+          <Link href="/documents" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <FileText className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="w-2 h-2 bg-medical-blue rounded-full"></div>
+                </div>
+                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Документы</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Храните анализы и медицинские документы
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                  Открыть
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <Heart className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Дневник здоровья</CardTitle>
-              <CardDescription>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <Heart className="h-8 w-8 text-primary" />
+                </div>
+                <div className="w-2 h-2 bg-medical-red rounded-full"></div>
+              </div>
+              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Дневник здоровья</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
                 Отслеживайте симптомы и самочувствие
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button className="w-full">Записать</Button>
+            <CardContent className="pt-0">
+              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                Записать
+              </Button>
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <TrendingUp className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Аналитика</CardTitle>
-              <CardDescription>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <TrendingUp className="h-8 w-8 text-primary" />
+                </div>
+                <div className="w-2 h-2 bg-medical-green rounded-full"></div>
+              </div>
+              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Аналитика</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
                 Просматривайте статистику и графики
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button className="w-full">Анализ</Button>
+            <CardContent className="pt-0">
+              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                Анализ
+              </Button>
             </CardContent>
           </Card>
 
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <User className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Профиль</CardTitle>
-              <CardDescription>
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                  <User className="h-8 w-8 text-primary" />
+                </div>
+                <div className="w-2 h-2 bg-medical-coral rounded-full"></div>
+              </div>
+              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Профиль</CardTitle>
+              <CardDescription className="text-sm leading-relaxed">
                 Управляйте личными данными и настройками
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button className="w-full">Настройки</Button>
+            <CardContent className="pt-0">
+              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                Настройки
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -323,32 +383,43 @@ export default function DashboardPage() {
 
         {/* Recent Activity */}
         <div className="mt-8">
-          <Card>
+          <Card className="glass-effect border-0 shadow-medical">
             <CardHeader>
-              <CardTitle>Последняя активность</CardTitle>
-              <CardDescription>Ваши недавние действия</CardDescription>
+              <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
+                Последняя активность
+              </CardTitle>
+              <CardDescription className="text-base">Ваши недавние действия</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-50/50 to-green-50/50 border border-blue-100/50">
+                  <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-green-500 rounded-full animate-pulse"></div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Принято лекарство "Аспирин"</p>
-                    <p className="text-xs text-muted-foreground">2 часа назад</p>
+                    <p className="text-sm font-semibold text-gray-800">Принято лекарство "Аспирин"</p>
+                    <p className="text-xs text-muted-foreground mt-1">2 часа назад</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-blue-100/50">
+                    <Pill className="h-4 w-4 text-blue-600" />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-green-50/50 to-emerald-50/50 border border-green-100/50">
+                  <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Добавлена запись в дневник</p>
-                    <p className="text-xs text-muted-foreground">Вчера в 18:30</p>
+                    <p className="text-sm font-semibold text-gray-800">Добавлена запись в дневник</p>
+                    <p className="text-xs text-muted-foreground mt-1">Вчера в 18:30</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-green-100/50">
+                    <Heart className="h-4 w-4 text-green-600" />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 bg-muted rounded-full"></div>
+                <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-amber-50/50 to-orange-50/50 border border-amber-100/50">
+                  <div className="w-3 h-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"></div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Загружен анализ крови</p>
-                    <p className="text-xs text-muted-foreground">3 дня назад</p>
+                    <p className="text-sm font-semibold text-gray-800">Загружен анализ крови</p>
+                    <p className="text-xs text-muted-foreground mt-1">3 дня назад</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-amber-100/50">
+                    <FileText className="h-4 w-4 text-amber-600" />
                   </div>
                 </div>
               </div>

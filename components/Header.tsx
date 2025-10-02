@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Menu, User, Bell, Settings } from 'lucide-react'
+import { Menu, User, Bell, Settings, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -43,12 +43,15 @@ export function Header() {
               <Link href="/analyses" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Анализы
               </Link>
-              <Link href="/reminders" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
-                Напоминания
-              </Link>
               <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
                 Рекомендации
               </Link>
+              {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+                <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
+                  <Shield className="h-4 w-4" />
+                  Админ
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -58,10 +61,12 @@ export function Header() {
             user ? (
               <div className="hidden md:flex items-center gap-2">
                 {/* Уведомления */}
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-medical-coral rounded-full animate-pulse"></span>
-                </Button>
+                <Link href="/reminders">
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    <span className="absolute -top-1 -right-1 h-3 w-3 bg-medical-coral rounded-full animate-pulse"></span>
+                  </Button>
+                </Link>
                 
                 {/* Настройки */}
                 <Button variant="ghost" size="icon">
@@ -137,19 +142,30 @@ export function Header() {
                   Анализы
                 </Link>
                 <Link 
-                  href="/reminders" 
-                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Напоминания
-                </Link>
-                <Link 
                   href="/marketplace" 
                   className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Рекомендации
                 </Link>
+                <Link 
+                  href="/reminders" 
+                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Bell className="h-4 w-4" />
+                  Напоминания
+                </Link>
+                {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+                  <Link 
+                    href="/admin" 
+                    className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Shield className="h-4 w-4" />
+                    Админ-панель
+                  </Link>
+                )}
               </>
             )}
             
@@ -189,4 +205,5 @@ export function Header() {
     </header>
   )
 }
+
 
