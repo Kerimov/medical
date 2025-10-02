@@ -147,18 +147,35 @@ export default function DashboardPage() {
 
         {/* Main Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
-            <CardHeader>
-              <Bell className="h-10 w-10 text-primary mb-3" />
-              <CardTitle>Напоминания</CardTitle>
-              <CardDescription>
-                Настройте напоминания о приеме лекарств
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full">Управлять</Button>
-            </CardContent>
-          </Card>
+          <Link href="/reminders" className="block">
+            <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <Bell className="h-10 w-10 text-primary mb-3" />
+                <CardTitle>Напоминания</CardTitle>
+                <CardDescription>
+                  Настройте напоминания о приеме лекарств
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full">Управлять</Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/analyses" className="block">
+            <Card className="border-2 hover:border-primary transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <TrendingUp className="h-10 w-10 text-primary mb-3" />
+                <CardTitle>Анализы</CardTitle>
+                <CardDescription>
+                  Просматривайте результаты ваших анализов
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full">Открыть</Button>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card className="border-2 hover:border-primary transition-colors cursor-pointer">
             <CardHeader>

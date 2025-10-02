@@ -228,10 +228,10 @@ export default function RemindersPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        {getTypeIcon(reminder.type)}
+                        <Bell className="h-4 w-4" />
                         <h3 className="font-semibold">{reminder.title}</h3>
-                        <Badge className={getPriorityColor(reminder.priority)}>
-                          {getPriorityLabel(reminder.priority)}
+                        <Badge className={getRecurrenceColor(reminder.recurrence)}>
+                          {getRecurrenceLabel(reminder.recurrence)}
                         </Badge>
                       </div>
                       {reminder.description && (
@@ -240,8 +240,8 @@ export default function RemindersPage() {
                         </p>
                       )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Срок: {new Date(reminder.dueDate).toLocaleDateString('ru-RU')}</span>
-                        <span>Тип: {getTypeLabel(reminder.type)}</span>
+                        <span>Срок: {new Date(reminder.dueAt).toLocaleDateString('ru-RU')}</span>
+                        <span>Повтор: {getRecurrenceLabel(reminder.recurrence)}</span>
                         {reminder.analysis && (
                           <Link href={`/analyses/${reminder.analysis.id}`} className="text-primary hover:underline">
                             Связанный анализ
@@ -280,10 +280,10 @@ export default function RemindersPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        {getTypeIcon(reminder.type)}
+                        <Bell className="h-4 w-4" />
                         <h3 className="font-semibold">{reminder.title}</h3>
-                        <Badge className={getPriorityColor(reminder.priority)}>
-                          {getPriorityLabel(reminder.priority)}
+                        <Badge className={getRecurrenceColor(reminder.recurrence)}>
+                          {getRecurrenceLabel(reminder.recurrence)}
                         </Badge>
                       </div>
                       {reminder.description && (
@@ -292,8 +292,8 @@ export default function RemindersPage() {
                         </p>
                       )}
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Срок: {new Date(reminder.dueDate).toLocaleDateString('ru-RU')}</span>
-                        <span>Тип: {getTypeLabel(reminder.type)}</span>
+                        <span>Срок: {new Date(reminder.dueAt).toLocaleDateString('ru-RU')}</span>
+                        <span>Повтор: {getRecurrenceLabel(reminder.recurrence)}</span>
                         {reminder.analysis && (
                           <Link href={`/analyses/${reminder.analysis.id}`} className="text-primary hover:underline">
                             Связанный анализ
@@ -321,43 +321,6 @@ export default function RemindersPage() {
         </div>
       )}
 
-      {/* Выполненные напоминания */}
-      {completedReminders.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Выполненные</h2>
-          <div className="space-y-4">
-            {completedReminders.map((reminder) => (
-              <Card key={reminder.id} className="opacity-75">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {getTypeIcon(reminder.type)}
-                        <h3 className="font-semibold line-through">{reminder.title}</h3>
-                        <Badge variant="secondary">Выполнено</Badge>
-                      </div>
-                      {reminder.description && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {reminder.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>Срок: {new Date(reminder.dueDate).toLocaleDateString('ru-RU')}</span>
-                        <span>Тип: {getTypeLabel(reminder.type)}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => deleteReminder(reminder.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Пустое состояние */}
       {reminders.length === 0 && (
