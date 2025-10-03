@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 import { 
   Users, 
@@ -17,7 +20,14 @@ import {
   Shield,
   Calendar,
   Mail,
-  ArrowLeft
+  ArrowLeft,
+  Save,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  User,
+  Stethoscope
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -25,6 +35,7 @@ interface User {
   id: string
   name: string
   email: string
+  role: 'PATIENT' | 'DOCTOR' | 'ADMIN'
   createdAt: string
   documentsCount: number
   analysesCount: number
@@ -33,27 +44,32 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const { user, isLoading } = useAuth()
+  const { user: currentUser, isLoading } = useAuth()
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [deleteUser, setDeleteUser] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  const isAdmin = !!(user && adminEmails.includes(user.email.toLowerCase()))
+  const isAdmin = !!(currentUser && currentUser.role === 'ADMIN')
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (!isLoading && !currentUser) {
       router.push('/login')
-    } else if (!isLoading && user && !isAdmin) {
+    } else if (!isLoading && currentUser && !isAdmin) {
       router.push('/dashboard')
     }
-  }, [user, isLoading, router, isAdmin])
+  }, [currentUser, isLoading, router, isAdmin])
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (!user || !isAdmin) return
+      if (!currentUser || !isAdmin) return
       
       try {
         setLoading(true)
@@ -76,30 +92,121 @@ export default function AdminUsersPage() {
     }
 
     fetchUsers()
-  }, [user, isAdmin])
+  }, [currentUser, isAdmin])
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) return
-    
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    setNewPassword('')
+    setMessage(null)
+  }
+
+  const handleSaveUser = async (updatedUser: User) => {
+    setSaving(true)
+    setMessage(null)
+
     try {
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const updateData: any = {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role
+      }
+
+      if (newPassword.trim()) {
+        updateData.password = newPassword
+      }
+
+      const response = await fetch(`/api/admin/users/${updatedUser.id}`, {
+        method: 'PUT',
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(users.map(u => u.id === updatedUser.id ? data : u))
+        setEditingUser(null)
+        setNewPassword('')
+        setMessage({ type: 'success', text: 'Пользователь успешно обновлен' })
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Ошибка при обновлении пользователя' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Ошибка при обновлении пользователя' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteUser = async (userToDelete: User) => {
+    setDeleting(true)
+    setMessage(null)
+
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const response = await fetch(`/api/admin/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
-      
+
       if (response.ok) {
-        setUsers(users.filter(user => user.id !== userId))
+        setUsers(users.filter(user => user.id !== userToDelete.id))
+        setDeleteUser(null)
+        setMessage({ type: 'success', text: 'Пользователь успешно удален' })
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Ошибка при удалении пользователя' })
       }
     } catch (error) {
-      console.error('Error deleting user:', error)
+      setMessage({ type: 'error', text: 'Ошибка при удалении пользователя' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return <Shield className="h-4 w-4" />
+      case 'DOCTOR':
+        return <Stethoscope className="h-4 w-4" />
+      default:
+        return <User className="h-4 w-4" />
+    }
+  }
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'destructive'
+      case 'DOCTOR':
+        return 'default'
+      default:
+        return 'secondary'
+    }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'Администратор'
+      case 'DOCTOR':
+        return 'Врач'
+      default:
+        return 'Пациент'
     }
   }
 
@@ -175,6 +282,7 @@ export default function AdminUsersPage() {
                   <TableRow>
                     <TableHead>Пользователь</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Роль</TableHead>
                     <TableHead>Дата регистрации</TableHead>
                     <TableHead>Активность</TableHead>
                     <TableHead>Действия</TableHead>
@@ -201,6 +309,12 @@ export default function AdminUsersPage() {
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">{user.email}</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getRoleBadgeVariant(user.role)} className="flex items-center gap-1 w-fit">
+                          {getRoleIcon(user.role)}
+                          {getRoleLabel(user.role)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -244,10 +358,7 @@ export default function AdminUsersPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // TODO: Редактирование пользователя
-                              alert('Функция редактирования будет добавлена')
-                            }}
+                            onClick={() => handleEditUser(user)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -255,7 +366,8 @@ export default function AdminUsersPage() {
                             size="sm"
                             variant="outline"
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => setDeleteUser(user)}
+                            disabled={user.id === currentUser?.id}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -268,6 +380,168 @@ export default function AdminUsersPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Messages */}
+        {message && (
+          <Alert className={`mb-6 ${message.type === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
+            {message.type === 'error' ? (
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            ) : (
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            )}
+            <AlertDescription className={message.type === 'error' ? 'text-red-800' : 'text-green-800'}>
+              {message.text}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Edit User Modal */}
+        {editingUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md glass-effect border-0 shadow-medical-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">Редактировать пользователя</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingUser(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit-name">Имя</Label>
+                    <Input
+                      id="edit-name"
+                      value={editingUser.name}
+                      onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={editingUser.email}
+                      onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-role">Роль</Label>
+                    <Select
+                      value={editingUser.role}
+                      onValueChange={(value) => setEditingUser({...editingUser, role: value as 'PATIENT' | 'DOCTOR' | 'ADMIN'})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PATIENT">Пациент</SelectItem>
+                        <SelectItem value="DOCTOR">Врач</SelectItem>
+                        <SelectItem value="ADMIN">Администратор</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-password">Новый пароль (оставьте пустым, чтобы не изменять)</Label>
+                    <Input
+                      id="edit-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Введите новый пароль"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      onClick={() => handleSaveUser(editingUser)}
+                      disabled={saving}
+                      className="flex-1"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Сохранение...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Сохранить
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingUser(null)}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md glass-effect border-0 shadow-medical-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl text-red-600">Подтверждение удаления</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDeleteUser(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-muted-foreground">
+                    Вы уверены, что хотите удалить пользователя <strong>{deleteUser.name}</strong>?
+                  </p>
+                  <p className="text-sm text-red-600">
+                    Это действие нельзя отменить. Все данные пользователя будут удалены.
+                  </p>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDeleteUser(deleteUser)}
+                      disabled={deleting}
+                      className="flex-1"
+                    >
+                      {deleting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Удаление...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Удалить
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setDeleteUser(null)}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* User Details Modal */}
         {selectedUser && (

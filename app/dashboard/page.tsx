@@ -26,8 +26,7 @@ export default function DashboardPage() {
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [adminDocs, setAdminDocs] = useState<any[]>([])
   const [adminLoading, setAdminLoading] = useState(true)
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  const isAdmin = !!(user && adminEmails.includes(user.email.toLowerCase()))
+  const isAdmin = !!(user && user.role === 'ADMIN')
 
   useEffect(() => {
     if (!isLoading && !user) {

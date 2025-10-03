@@ -6,6 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 export interface TokenPayload {
   userId: string
   email: string
+  role?: string
 }
 
 export const hashPassword = async (password: string): Promise<string> => {

@@ -23,7 +23,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+    const user = await prisma.user.findUnique({ 
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true
+      }
+    })
     
     if (!user) {
       return NextResponse.json(
@@ -36,7 +44,8 @@ export async function GET(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        role: user.role
       }
     })
   } catch (error) {

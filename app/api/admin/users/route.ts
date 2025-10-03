@@ -16,12 +16,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Проверяем права администратора
-    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId }
+      where: { id: decoded.userId },
+      select: { role: true }
     })
 
-    if (!user || !adminEmails.includes(user.email.toLowerCase())) {
+    if (!user || user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
     }
 
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
       createdAt: user.createdAt,
       documentsCount: user._count.documents,
       analysesCount: user._count.analyses,

@@ -50,8 +50,7 @@ export default function AdminDocumentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  const isAdmin = !!(user && adminEmails.includes(user.email.toLowerCase()))
+  const isAdmin = !!(user && user.role === 'ADMIN')
 
   useEffect(() => {
     if (!isLoading && !user) {

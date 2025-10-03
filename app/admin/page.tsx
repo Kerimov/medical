@@ -38,8 +38,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   
-  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  const isAdmin = !!(user && adminEmails.includes(user.email.toLowerCase()))
+  const isAdmin = !!(user && user.role === 'ADMIN')
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -234,6 +233,29 @@ export default function AdminPage() {
                 <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
                   <Eye className="mr-2 h-4 w-4" />
                   Управлять
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/users/roles" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <Settings className="h-8 w-8 text-purple-600" />
+                  </div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                </div>
+                <CardTitle className="text-xl mb-2 group-hover:text-purple-600 transition-colors">Управление ролями</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Назначение ролей пользователям: Пациент, Врач, Администратор
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 transition-opacity shadow-medical">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Управлять ролями
                 </Button>
               </CardContent>
             </Card>
