@@ -63,6 +63,7 @@ echo Следующие шаги:
 echo 1. Отредактируйте .env.local (если еще не сделали)
 echo 2. Запустите: npm run dev
 echo 3. Откройте: http://localhost:3000
-echo 4. Войдите: seed@example.com / seed1234
+echo 4. Войдите как администратор: admin@example.com / admin123
+echo 5. Или как пациент: testpatient@example.com / test123
 echo.
 pause
