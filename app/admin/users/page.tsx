@@ -26,6 +26,7 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  UserPlus,
   User,
   Stethoscope
 } from 'lucide-react'
@@ -56,6 +57,14 @@ export default function AdminUsersPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'PATIENT' as 'PATIENT' | 'DOCTOR' | 'ADMIN'
+  })
   
   const isAdmin = !!(currentUser && currentUser.role === 'ADMIN')
 
@@ -176,6 +185,47 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handleCreateUser = async () => {
+    if (!token) return
+    
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      setMessage({ type: 'error', text: 'Все поля обязательны для заполнения' })
+      return
+    }
+
+    if (newUser.password.length < 6) {
+      setMessage({ type: 'error', text: 'Пароль должен содержать минимум 6 символов' })
+      return
+    }
+
+    try {
+      setCreating(true)
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newUser)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUsers([data.user, ...users])
+        setShowCreateModal(false)
+        setNewUser({ name: '', email: '', password: '', role: 'PATIENT' })
+        setMessage({ type: 'success', text: 'Пользователь успешно создан' })
+      } else {
+        const error = await response.json()
+        setMessage({ type: 'error', text: error.error || 'Ошибка при создании пользователя' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Ошибка при создании пользователя' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'ADMIN':
@@ -263,6 +313,13 @@ export default function AdminUsersPage() {
             <Badge variant="secondary" className="px-3 py-1">
               {filteredUsers.length} пользователей
             </Badge>
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90 text-white"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Создать пользователя
+            </Button>
           </div>
         </div>
 
@@ -599,6 +656,115 @@ export default function AdminUsersPage() {
                       <strong>Дата регистрации:</strong> {new Date(selectedUser.createdAt).toLocaleString('ru-RU')}
                     </p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Create User Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md mx-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Создать пользователя
+                </CardTitle>
+                <CardDescription>
+                  Заполните данные для создания нового пользователя
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="create-name">Имя</Label>
+                  <Input
+                    id="create-name"
+                    placeholder="Введите имя"
+                    value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="create-email">Email</Label>
+                  <Input
+                    id="create-email"
+                    type="email"
+                    placeholder="Введите email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="create-password">Пароль</Label>
+                  <Input
+                    id="create-password"
+                    type="password"
+                    placeholder="Введите пароль (минимум 6 символов)"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="create-role">Роль</Label>
+                  <Select value={newUser.role} onValueChange={(value: 'PATIENT' | 'DOCTOR' | 'ADMIN') => setNewUser({ ...newUser, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите роль" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PATIENT">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Пациент
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="DOCTOR">
+                        <div className="flex items-center gap-2">
+                          <Stethoscope className="h-4 w-4" />
+                          Врач
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="ADMIN">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Администратор
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    onClick={handleCreateUser}
+                    disabled={creating}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:opacity-90"
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Создание...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Создать
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCreateModal(false)
+                      setNewUser({ name: '', email: '', password: '', role: 'PATIENT' })
+                    }}
+                    disabled={creating}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
