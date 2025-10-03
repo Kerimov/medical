@@ -5,10 +5,13 @@ import { verifyToken } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {
@@ -24,27 +27,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Профиль врача не найден' }, { status: 404 })
     }
 
-    // Получаем пациентов врача
-    const patients = await prisma.patientRecord.findMany({
+    // Получаем записи на прием к врачу
+    const appointments = await prisma.appointment.findMany({
       where: { doctorId: doctorProfile.id },
-      include: {
-        patient: true
-      },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { scheduledAt: 'desc' }
+    })
+
+    // Получаем уникальных пациентов
+    const uniquePatients = new Map()
+    appointments.forEach(appointment => {
+      if (!uniquePatients.has(appointment.patientId)) {
+        uniquePatients.set(appointment.patientId, {
+          id: appointment.patientId,
+          name: appointment.patientName,
+          email: appointment.patientEmail,
+          lastAppointment: appointment.scheduledAt,
+          appointmentCount: 1,
+          lastAppointmentType: appointment.appointmentType,
+          lastAppointmentStatus: appointment.status
+        })
+      } else {
+        const patient = uniquePatients.get(appointment.patientId)
+        patient.appointmentCount += 1
+        if (appointment.scheduledAt > patient.lastAppointment) {
+          patient.lastAppointment = appointment.scheduledAt
+          patient.lastAppointmentType = appointment.appointmentType
+          patient.lastAppointmentStatus = appointment.status
+        }
+      }
     })
 
     // Форматируем данные для ответа
-    const formattedPatients = patients.map(record => ({
-      id: record.id,
-      name: record.patient.name,
-      email: record.patient.email,
-      phone: record.patient.phone || null,
-      recordType: record.recordType,
-      diagnosis: record.diagnosis,
-      status: record.status,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      nextVisit: record.nextVisit
+    const formattedPatients = Array.from(uniquePatients.values()).map(patient => ({
+      id: patient.id,
+      name: patient.name,
+      email: patient.email,
+      phone: null, // В модели User нет поля phone
+      recordType: patient.lastAppointmentType,
+      diagnosis: null,
+      status: patient.lastAppointmentStatus,
+      createdAt: patient.lastAppointment,
+      updatedAt: patient.lastAppointment,
+      nextVisit: null,
+      appointmentCount: patient.appointmentCount
     }))
 
     return NextResponse.json(formattedPatients)
@@ -61,10 +86,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {

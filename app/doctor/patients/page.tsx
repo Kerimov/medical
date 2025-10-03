@@ -32,10 +32,11 @@ interface Patient {
   createdAt: string
   updatedAt: string
   nextVisit?: string
+  appointmentCount?: number
 }
 
 export default function DoctorPatients() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, token } = useAuth()
   const router = useRouter()
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,20 +48,26 @@ export default function DoctorPatients() {
       return
     }
 
-    if (user) {
+    if (user && token) {
       fetchPatients()
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, token])
 
   const fetchPatients = async () => {
+    if (!token) return
+    
     try {
       const response = await fetch('/api/doctor/patients', {
-        credentials: 'include'
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       })
       
       if (response.ok) {
         const data = await response.json()
         setPatients(data)
+      } else {
+        console.error('Error fetching patients:', response.status)
       }
     } catch (error) {
       console.error('Error fetching patients:', error)
@@ -184,6 +191,13 @@ export default function DoctorPatients() {
                       {patient.recordType}
                     </Badge>
                   </div>
+
+                  {patient.appointmentCount && (
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4" />
+                      <span>Записей: {patient.appointmentCount}</span>
+                    </div>
+                  )}
 
                   {patient.diagnosis && (
                     <div className="text-sm">

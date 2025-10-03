@@ -5,10 +5,13 @@ import { verifyToken } from '@/lib/auth'
 export async function GET(request: NextRequest) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {
@@ -47,10 +50,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
+
+    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {
