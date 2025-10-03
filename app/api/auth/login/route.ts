@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       role: user.role
     })
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: 'Вход выполнен успешно',
       token,
       user: {
@@ -69,6 +69,16 @@ export async function POST(request: NextRequest) {
         role: user.role
       }
     })
+
+    // Устанавливаем cookie с токеном
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 // 7 дней
+    })
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

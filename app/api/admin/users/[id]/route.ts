@@ -6,11 +6,13 @@ import bcrypt from 'bcryptjs'
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
     }
 
+    const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
@@ -70,11 +72,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
     }
 
+    const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
@@ -166,11 +170,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Проверяем токен
-    const token = request.cookies.get('token')?.value
-    if (!token) {
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
     }
 
+    const token = authHeader.substring(7)
     const decoded = verifyToken(token)
     if (!decoded) {
       return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })

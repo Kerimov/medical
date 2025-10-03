@@ -81,7 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(data.error || 'Ошибка входа')
     }
 
-    Cookies.set('token', data.token, { expires: 7 })
     setUser(data.user)
     setToken(data.token)
   }
@@ -101,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(data.error || 'Ошибка регистрации')
     }
 
-    Cookies.set('token', data.token, { expires: 7 })
     setUser(data.user)
     setToken(data.token)
   }

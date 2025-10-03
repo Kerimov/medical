@@ -44,7 +44,7 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const { user: currentUser, isLoading } = useAuth()
+  const { user: currentUser, isLoading, token } = useAuth()
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,7 +73,6 @@ export default function AdminUsersPage() {
       
       try {
         setLoading(true)
-        const token = localStorage.getItem('token')
         if (!token) return
 
         const response = await fetch('/api/admin/users', {
@@ -92,7 +91,7 @@ export default function AdminUsersPage() {
     }
 
     fetchUsers()
-  }, [currentUser, isAdmin])
+  }, [currentUser, isAdmin, token])
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,7 +109,7 @@ export default function AdminUsersPage() {
     setMessage(null)
 
     try {
-      const token = localStorage.getItem('token')
+      if (!token) return
       if (!token) return
 
       const updateData: any = {
@@ -154,7 +153,7 @@ export default function AdminUsersPage() {
     setMessage(null)
 
     try {
-      const token = localStorage.getItem('token')
+      if (!token) return
       if (!token) return
 
       const response = await fetch(`/api/admin/users/${userToDelete.id}`, {
@@ -221,7 +220,7 @@ export default function AdminUsersPage() {
     )
   }
 
-  if (!user || !isAdmin) {
+  if (!currentUser || !isAdmin) {
     return null
   }
 
