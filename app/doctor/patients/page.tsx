@@ -173,7 +173,10 @@ export default function DoctorPatients() {
                     </div>
                   </div>
                   <Badge className={getStatusColor(patient.status)}>
-                    {patient.status}
+                    {patient.status === 'active' ? 'Активен' : 
+                     patient.status === 'completed' ? 'Завершен' : 
+                     patient.status === 'cancelled' ? 'Отменен' : 
+                     patient.status}
                   </Badge>
                 </div>
               </CardHeader>

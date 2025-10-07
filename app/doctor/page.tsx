@@ -297,13 +297,13 @@ export default function DoctorDashboard() {
                           <TableCell>{a.appointmentType || '—'}</TableCell>
                           <TableCell>
                             {a.status === 'cancelled' ? (
-                              <Badge className="bg-red-100 text-red-800 border border-red-200">cancelled</Badge>
+                              <Badge className="bg-red-100 text-red-800 border border-red-200">Отменено</Badge>
                             ) : a.status === 'rescheduled' ? (
-                              <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">rescheduled</Badge>
+                              <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">Перенесено</Badge>
                             ) : a.status === 'confirmed' ? (
-                              <Badge className="bg-green-600 text-white">confirmed</Badge>
+                              <Badge className="bg-green-600 text-white">Подтверждено</Badge>
                             ) : (
-                              <Badge className="bg-green-100 text-green-800 border border-green-200">{a.status || 'scheduled'}</Badge>
+                              <Badge className="bg-green-100 text-green-800 border border-green-200">Запланировано</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right">

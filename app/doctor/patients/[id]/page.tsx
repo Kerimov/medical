@@ -187,7 +187,12 @@ export default function PatientCardPage() {
                 <div className="flex items-center justify-between"><span>Тип записи</span><Badge>{patientRecord?.recordType || '—'}</Badge></div>
                 {patientRecord?.diagnosis && (<div className="flex items-center justify-between"><span>Диагноз</span><span className="font-medium">{patientRecord.diagnosis}</span></div>)}
                 {patientRecord?.nextVisit && (<div className="flex items-center justify-between"><span>Следующий визит</span><span>{new Date(patientRecord.nextVisit).toLocaleString('ru-RU')}</span></div>)}
-                <div className="flex items-center justify-between"><span>Статус</span><Badge variant="secondary">{patientRecord?.status || '—'}</Badge></div>
+                <div className="flex items-center justify-between"><span>Статус</span><Badge variant="secondary">
+                  {patientRecord?.status === 'active' ? 'Активен' : 
+                   patientRecord?.status === 'completed' ? 'Завершен' : 
+                   patientRecord?.status === 'cancelled' ? 'Отменен' : 
+                   patientRecord?.status || '—'}
+                </Badge></div>
               </div>
             </CardContent>
           </Card>
@@ -302,7 +307,14 @@ export default function PatientCardPage() {
                   <div className="text-sm font-medium mb-2">Ближайшие визиты</div>
                   {appointments.slice(0, 3).map((v) => (
                     <div key={v.id} className="text-sm text-muted-foreground flex items-center gap-2 mb-1">
-                      <Calendar className="w-4 h-4" /> {new Date(v.scheduledAt).toLocaleString('ru-RU')} · {v.status}
+                      <Calendar className="w-4 h-4" /> {new Date(v.scheduledAt).toLocaleString('ru-RU')} · {
+                        v.status === 'scheduled' ? 'Запланировано' : 
+                        v.status === 'confirmed' ? 'Подтверждено' : 
+                        v.status === 'completed' ? 'Завершено' : 
+                        v.status === 'cancelled' ? 'Отменено' : 
+                        v.status === 'rescheduled' ? 'Перенесено' : 
+                        v.status
+                      }
                     </div>
                   ))}
                   {appointments.length === 0 && <div className="text-sm text-muted-foreground">Нет визитов</div>}

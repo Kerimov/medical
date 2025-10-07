@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Loader2,
   ArrowLeft,
-  FileText
+  FileText,
+  X,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -70,6 +72,14 @@ export default function MyAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
+  const [rescheduleFormState, setRescheduleFormState] = useState({
+    date: '',
+    time: '',
+    appointmentId: ''
+  })
+  const [updating, setUpdating] = useState<string | null>(null)
 
   const isPatient = !!(currentUser && currentUser.role === 'PATIENT')
 
@@ -141,6 +151,92 @@ export default function MyAppointmentsPage() {
 
   const isUpcoming = (scheduledAt: string) => {
     return new Date(scheduledAt) > new Date()
+  }
+
+  const handleStatusChange = async (appointmentId: string, newStatus: string, newScheduledAt?: string) => {
+    if (!token) return
+
+    setUpdating(appointmentId)
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          ...(newScheduledAt && { scheduledAt: newScheduledAt })
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Обновляем список записей
+        setAppointments(prev => prev.map(app => 
+          app.id === appointmentId 
+            ? { ...app, status: newStatus, ...(newScheduledAt && { scheduledAt: newScheduledAt }) }
+            : app
+        ))
+        
+        setMessage({ 
+          type: 'success', 
+          text: newStatus === 'cancelled' ? 'Запись отменена' : 'Запись перенесена' 
+        })
+        
+        setIsRescheduleOpen(false)
+        setSelectedAppointment(null)
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Ошибка при обновлении записи' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Ошибка при обновлении записи' })
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const openRescheduleModal = (appointment: Appointment) => {
+    const appointmentDate = new Date(appointment.scheduledAt)
+    setRescheduleFormState({
+      date: appointmentDate.toISOString().split('T')[0],
+      time: appointmentDate.toTimeString().slice(0, 5),
+      appointmentId: appointment.id
+    })
+    setSelectedAppointment(appointment)
+    setIsRescheduleOpen(true)
+  }
+
+  const handleRescheduleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!rescheduleFormState.date || !rescheduleFormState.time) return
+
+    const newScheduledAt = new Date(`${rescheduleFormState.date}T${rescheduleFormState.time}`)
+    handleStatusChange(rescheduleFormState.appointmentId, 'scheduled', newScheduledAt.toISOString())
+  }
+
+  const generateTimeSlots = () => {
+    const slots = []
+    for (let hour = 9; hour < 21; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+        slots.push(time)
+      }
+    }
+    return slots
+  }
+
+  const isSlotOccupied = (date: string, time: string) => {
+    if (!selectedAppointment) return false
+    
+    const slotDateTime = new Date(`${date}T${time}`)
+    return appointments.some(app => 
+      app.id !== selectedAppointment.id &&
+      app.doctorId === selectedAppointment.doctorId &&
+      new Date(app.scheduledAt).getTime() === slotDateTime.getTime() &&
+      app.status !== 'cancelled'
+    )
   }
 
   if (isLoading || loading) {
@@ -279,6 +375,32 @@ export default function MyAppointmentsPage() {
                         </p>
                       </div>
                     )}
+
+                    {/* Кнопки управления записью */}
+                    {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openRescheduleModal(appointment)}
+                          disabled={updating === appointment.id}
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          {updating === appointment.id ? 'Перенос...' : 'Перенести'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStatusChange(appointment.id, 'cancelled')}
+                          disabled={updating === appointment.id}
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          {updating === appointment.id ? 'Отмена...' : 'Отменить'}
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -367,6 +489,93 @@ export default function MyAppointmentsPage() {
           </Card>
         )}
       </main>
+
+      {/* Модальное окно переноса записи */}
+      {isRescheduleOpen && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Перенос записи</h3>
+            
+            <form onSubmit={handleRescheduleSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Врач</label>
+                <p className="text-gray-700">{selectedAppointment.doctor.user.name}</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Текущая запись</label>
+                <p className="text-gray-700">
+                  {new Date(selectedAppointment.scheduledAt).toLocaleDateString('ru-RU')} в{' '}
+                  {new Date(selectedAppointment.scheduledAt).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="date" className="block text-sm font-medium mb-2">
+                  Новая дата
+                </label>
+                <input
+                  id="date"
+                  type="date"
+                  value={rescheduleFormState.date}
+                  onChange={(e) => setRescheduleFormState(prev => ({ ...prev, date: e.target.value }))}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">Новое время</label>
+                <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                  {generateTimeSlots().map((time) => {
+                    const isOccupied = isSlotOccupied(rescheduleFormState.date, time)
+                    const isSelected = rescheduleFormState.time === time
+                    return (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => setRescheduleFormState(prev => ({ ...prev, time }))}
+                        disabled={isOccupied}
+                        className={`p-2 text-sm rounded border ${
+                          isSelected
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : isOccupied
+                            ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {time}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsRescheduleOpen(false)}
+                  className="flex-1"
+                >
+                  Отмена
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!rescheduleFormState.date || !rescheduleFormState.time}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  Перенести
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
