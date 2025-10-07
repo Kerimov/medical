@@ -29,7 +29,24 @@ export async function GET(
     }
 
     if (document.userId !== payload.userId) {
-      return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
+      // Разрешаем врачу доступ, если пациент прикреплен или есть прием
+      const isDoctor = payload.role === 'DOCTOR'
+      if (isDoctor) {
+        const doctor = await prisma.doctorProfile.findUnique({ where: { userId: payload.userId } })
+        if (doctor) {
+          const [hasRecord, hasAppointment] = await Promise.all([
+            prisma.patientRecord.findFirst({ where: { doctorId: doctor.id, patientId: document.userId }, select: { id: true } }),
+            prisma.appointment.findFirst({ where: { doctorId: doctor.id, patientId: document.userId }, select: { id: true } })
+          ])
+          if (!hasRecord && !hasAppointment) {
+            return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
+          }
+        } else {
+          return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
+        }
+      } else {
+        return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 })
+      }
     }
 
     return NextResponse.json({ document })

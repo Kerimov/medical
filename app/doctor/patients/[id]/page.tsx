@@ -99,10 +99,10 @@ export default function PatientCardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between"><span>Тип записи</span><Badge>{patientRecord.recordType}</Badge></div>
-                {patientRecord.diagnosis && (<div className="flex items-center justify-between"><span>Диагноз</span><span className="font-medium">{patientRecord.diagnosis}</span></div>)}
-                {patientRecord.nextVisit && (<div className="flex items-center justify-between"><span>Следующий визит</span><span>{new Date(patientRecord.nextVisit).toLocaleString('ru-RU')}</span></div>)}
-                <div className="flex items-center justify-between"><span>Статус</span><Badge variant="secondary">{patientRecord.status}</Badge></div>
+                <div className="flex items-center justify-between"><span>Тип записи</span><Badge>{patientRecord?.recordType || '—'}</Badge></div>
+                {patientRecord?.diagnosis && (<div className="flex items-center justify-between"><span>Диагноз</span><span className="font-medium">{patientRecord.diagnosis}</span></div>)}
+                {patientRecord?.nextVisit && (<div className="flex items-center justify-between"><span>Следующий визит</span><span>{new Date(patientRecord.nextVisit).toLocaleString('ru-RU')}</span></div>)}
+                <div className="flex items-center justify-between"><span>Статус</span><Badge variant="secondary">{patientRecord?.status || '—'}</Badge></div>
               </div>
             </CardContent>
           </Card>

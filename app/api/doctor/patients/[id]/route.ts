@@ -27,9 +27,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Профиль врача не найден' }, { status: 404 })
     }
 
-    const patientRecord = doctorProfile.patientRecords[0] || null
+    let patientRecord = doctorProfile.patientRecords[0] || null
     if (!patientRecord) {
-      return NextResponse.json({ error: 'Пациент не прикреплен к врачу' }, { status: 403 })
+      // Разрешаем доступ, если есть хотя бы одна запись на прием у этого врача с данным пациентом
+      const hasAppointment = await prisma.appointment.findFirst({
+        where: { doctorId: doctorProfile.id, patientId },
+        select: { id: true }
+      })
+      if (!hasAppointment) {
+        return NextResponse.json({ error: 'Пациент не прикреплен к врачу' }, { status: 403 })
+      }
     }
 
     const [patient, analyses, recommendations, appointments, prescriptions, notes] = await Promise.all([
@@ -54,11 +61,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         orderBy: { scheduledAt: 'desc' }
       }),
       prisma.prescription.findMany({
-        where: { patientRecordId: patientRecord.id },
+        where: patientRecord ? { patientRecordId: patientRecord.id } : { patientRecordId: '' },
         orderBy: { prescribedAt: 'desc' }
       }),
       prisma.medicalNote.findMany({
-        where: { patientRecordId: patientRecord.id },
+        where: patientRecord ? { patientRecordId: patientRecord.id } : { patientRecordId: '' },
         orderBy: { createdAt: 'desc' }
       })
     ])
