@@ -24,19 +24,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Профиль врача не найден' }, { status: 404 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const filterPatientId = searchParams.get('patientId')
+
     // Получаем всех пациентов врача
     const patientRecords = await prisma.patientRecord.findMany({
       where: { doctorId: doctorProfile.id },
       select: { patientId: true }
     })
 
-    const patientIds = patientRecords.map(record => record.patientId)
+    let patientIds = patientRecords.map(record => record.patientId)
+    if (filterPatientId) {
+      patientIds = patientIds.filter(id => id === filterPatientId)
+    }
 
     if (patientIds.length === 0) {
       return NextResponse.json([])
     }
 
-    // Получаем анализы всех пациентов врача
+    // Получаем анализы пациентов (возможен фильтр по одному пациенту)
     const analyses = await prisma.analysis.findMany({
       where: {
         userId: {

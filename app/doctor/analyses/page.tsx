@@ -59,7 +59,13 @@ export default function DoctorAnalyses() {
 
   const fetchAnalyses = async () => {
     try {
-      const response = await fetch('/api/doctor/analyses', {
+      const params = new URLSearchParams()
+      // Поддерживаем фильтр по patientId из query
+      const url = new URL(window.location.href)
+      const patientId = url.searchParams.get('patientId')
+      if (patientId) params.set('patientId', patientId)
+
+      const response = await fetch(`/api/doctor/analyses?${params.toString()}`, {
         credentials: 'include'
       })
       
