@@ -296,7 +296,15 @@ export default function DoctorDashboard() {
                           <TableCell>{a.patientName || '—'}</TableCell>
                           <TableCell>{a.appointmentType || '—'}</TableCell>
                           <TableCell>
-                            <Badge variant={a.status === 'confirmed' ? 'default' : 'secondary'}>{a.status || 'запланирован'}</Badge>
+                            {a.status === 'cancelled' ? (
+                              <Badge className="bg-red-100 text-red-800 border border-red-200">cancelled</Badge>
+                            ) : a.status === 'rescheduled' ? (
+                              <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">rescheduled</Badge>
+                            ) : a.status === 'confirmed' ? (
+                              <Badge className="bg-green-600 text-white">confirmed</Badge>
+                            ) : (
+                              <Badge className="bg-green-100 text-green-800 border border-green-200">{a.status || 'scheduled'}</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Link href={`/doctor/patients/${a.patientId}`} className="text-primary hover:underline">Карточка</Link>

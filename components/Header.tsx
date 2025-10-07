@@ -105,7 +105,7 @@ export function Header() {
                 </Button>
                 
                 {/* Личный кабинет */}
-                <Link href="/dashboard">
+                <Link href={isDoctor ? "/doctor" : "/dashboard"}>
                   <Button className="gradient-primary text-white hover:opacity-90 transition-opacity">
                     <User className="mr-2 h-4 w-4" />
                     Личный кабинет
@@ -214,7 +214,7 @@ export function Header() {
               {!isLoading && (
                 user ? (
                   <>
-                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                    <Link href={isDoctor ? "/doctor" : "/dashboard"} onClick={() => setMobileMenuOpen(false)}>
                       <Button className="w-full gradient-primary text-white">
                         <User className="mr-2 h-4 w-4" />
                         Личный кабинет

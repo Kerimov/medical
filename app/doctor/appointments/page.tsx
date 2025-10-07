@@ -113,6 +113,14 @@ export default function DoctorAppointmentsPage() {
 
   const hours = Array.from({ length: 13 }, (_, i) => 9 + i) // 09-21
   const PX_PER_HOUR = 60
+  // Список 15-минутных слотов (09:00 - 20:45)
+  const timeSlots15 = Array.from({ length: 12 * 4 }, (_, i) => {
+    const hour = 9 + Math.floor(i / 4)
+    const minute = (i % 4) * 15
+    const hh = String(hour).padStart(2, '0')
+    const mm = String(minute).padStart(2, '0')
+    return `${hh}:${mm}`
+  })
   const days = isMonthView
     ? []
     : isDayView
@@ -183,7 +191,6 @@ export default function DoctorAppointmentsPage() {
                   else if (isDayView) setSelectedDate(addDays(selectedDate, 1))
                   else setWeekStart(addDays(weekStart, 7))
                 }}>След. ▶</Button>
-                <Button variant={isDayView && !isMonthView ? 'default' : 'outline'} onClick={() => { setIsDayView(true); setIsMonthView(false) }}>День</Button>
                 <Button variant={!isDayView && !isMonthView ? 'default' : 'outline'} onClick={() => { setIsDayView(false); setIsMonthView(false); setWeekStart(getWeekStart(selectedDate)) }}>Неделя</Button>
                 <Button variant={isMonthView ? 'default' : 'outline'} onClick={() => { setIsMonthView(true); setIsDayView(false) }}>Месяц</Button>
               </div>
@@ -191,10 +198,7 @@ export default function DoctorAppointmentsPage() {
           </CardHeader>
           <CardContent>
             <div className="w-full overflow-x-auto">
-              {/* Кнопка создать */}
-              <div className="mb-3 flex justify-end">
-                <Button onClick={() => { const d = isMonthView ? selectedDate : (isDayView ? selectedDate : days[0]); setFormState(s => ({ ...s, date: d.toISOString().slice(0,10) })); setIsCreateOpen(true) }}>Создать запись</Button>
-              </div>
+              {/* Кнопка создать удалена по требованию */}
               {!isMonthView && (
                 <>
                   {/* Шапка дней */}
@@ -403,28 +407,63 @@ export default function DoctorAppointmentsPage() {
                         {new Date(selectedAppointment.scheduledAt).toLocaleDateString('ru-RU')} в {new Date(selectedAppointment.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="text-xs text-gray-600 mb-1">Новая дата</div>
-                        <input 
-                          type="date" 
-                          className="w-full border rounded px-2 py-1" 
-                          value={rescheduleFormState.date} 
-                          onChange={(e) => setRescheduleFormState(s => ({ ...s, date: e.target.value }))} 
-                        />
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-600 mb-1">Новое время</div>
-                        <input 
-                          type="time" 
-                          className="w-full border rounded px-2 py-1" 
-                          step={900} 
-                          min="09:00" 
-                          max="21:00" 
-                          value={rescheduleFormState.time} 
-                          onChange={(e) => setRescheduleFormState(s => ({ ...s, time: e.target.value }))} 
-                        />
-                      </div>
+                    <div>
+                      <div className="text-xs text-gray-600 mb-1">Новая дата</div>
+                      <input 
+                        type="date" 
+                        className="w-full border rounded px-2 py-1" 
+                        value={rescheduleFormState.date} 
+                        onChange={(e) => setRescheduleFormState(s => ({ ...s, date: e.target.value }))} 
+                      />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium mb-2">Выбор времени</div>
+                      <div className="text-xs text-gray-500 mb-2">Выберите доступное время (слоты по 15 минут)</div>
+                      {(() => {
+                        const dateStr = rescheduleFormState.date
+                        const busySet = new Set<string>()
+                        if (dateStr) {
+                          const [y, m, d] = dateStr.split('-').map(v => parseInt(v, 10))
+                          const dayStart = new Date(y, (m - 1), d, 0, 0, 0, 0)
+                          const dayEnd = new Date(y, (m - 1), d, 23, 59, 59, 999)
+                          appointments
+                            .filter(a => a.id !== selectedAppointment.id && a.status !== 'cancelled')
+                            .forEach(a => {
+                              const t = new Date(a.scheduledAt)
+                              if (t >= dayStart && t <= dayEnd) {
+                                const hh = String(t.getHours()).padStart(2, '0')
+                                const mm = String(t.getMinutes()).padStart(2, '0')
+                                busySet.add(`${hh}:${mm}`)
+                              }
+                            })
+                        }
+                        return (
+                          <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto pr-1">
+                            {timeSlots15.map(slot => {
+                              const isBusy = busySet.has(slot)
+                              const isSelected = rescheduleFormState.time === slot
+                              return (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => setRescheduleFormState(s => ({ ...s, time: slot }))}
+                                  className={`px-3 py-2 rounded border text-sm transition-colors ${
+                                    isBusy
+                                      ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                      : isSelected
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'bg-white hover:bg-blue-50 border-gray-200'
+                                  }`}
+                                  title={isBusy ? 'Занято' : 'Свободно'}
+                                >
+                                  {slot}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                   <div className="mt-6 flex gap-2">
