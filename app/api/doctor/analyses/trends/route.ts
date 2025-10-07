@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
     if (!hasRecord && !hasAppointment) return NextResponse.json({ error: 'Нет доступа к пациенту' }, { status: 403 })
 
     const analyses = await prisma.analysis.findMany({
-      where: { userId: patientId, parsed: true },
+      where: { userId: patientId },
       orderBy: { date: 'asc' },
-      select: { id: true, date: true, indicators: true, title: true, type: true }
+      select: { id: true, date: true, results: true, title: true, type: true }
     })
 
     type SeriesPoint = { date: string; value: number; referenceMin?: number | null; referenceMax?: number | null; isNormal?: boolean | null }
@@ -44,7 +44,11 @@ export async function GET(request: NextRequest) {
     const byIndicator: Record<string, SeriesPoint[]> = {}
     for (const a of analyses) {
       const dateIso = (a.date as unknown as Date).toISOString()
-      const indicators: any[] = Array.isArray(a.indicators) ? a.indicators as any[] : []
+      let indicators: any[] = []
+      try {
+        const r = a?.results ? JSON.parse(a.results as unknown as string) : {}
+        if (Array.isArray(r?.indicators)) indicators = r.indicators
+      } catch {}
       for (const ind of indicators) {
         const name: string = ind?.name || 'Показатель'
         const value = typeof ind?.value === 'number' ? ind.value : Number(ind?.value)
@@ -65,9 +69,9 @@ export async function GET(request: NextRequest) {
     Object.values(byIndicator).forEach(arr => arr.sort((a, b) => a.date.localeCompare(b.date)))
 
     return NextResponse.json({ indicators: byIndicator })
-  } catch (e) {
+  } catch (e: any) {
     console.error('Trends API error:', e)
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 })
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера', details: e?.message || String(e) }, { status: 500 })
   }
 }
 

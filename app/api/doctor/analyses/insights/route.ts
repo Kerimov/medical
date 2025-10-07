@@ -34,14 +34,18 @@ export async function GET(request: NextRequest) {
 
     // collect last 12 months analyses
     const analyses = await prisma.analysis.findMany({
-      where: { userId: patientId, parsed: true },
+      where: { userId: patientId },
       orderBy: { date: 'asc' },
-      select: { id: true, date: true, title: true, indicators: true }
+      select: { id: true, date: true, title: true, results: true }
     })
 
     const summaryInput = analyses.slice(-40).map(a => {
       const date = (a.date as unknown as Date).toISOString().slice(0,10)
-      const indicators = Array.isArray(a.indicators) ? a.indicators as any[] : []
+      let indicators: any[] = []
+      try {
+        const r = a?.results ? JSON.parse(a.results as unknown as string) : {}
+        if (Array.isArray(r?.indicators)) indicators = r.indicators
+      } catch {}
       const lines = indicators
         .filter(i => typeof i?.value !== 'undefined')
         .map(i => `${i.name}: ${i.value}${i.unit ? ' ' + i.unit : ''} [${i.referenceMin ?? ''}-${i.referenceMax ?? ''}] ${i.isNormal === false ? '(abn)' : ''}`)
@@ -91,9 +95,9 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ insights })
-  } catch (e) {
+  } catch (e: any) {
     console.error('Insights API error:', e)
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 })
+    return NextResponse.json({ error: 'Внутренняя ошибка сервера', details: e?.message || String(e) }, { status: 500 })
   }
 }
 

@@ -29,6 +29,8 @@ export default function PatientCardPage() {
   const [trends, setTrends] = useState<Record<string, { date: string; value: number; referenceMin?: number | null; referenceMax?: number | null; isNormal?: boolean | null }[]>>({})
   const [insights, setInsights] = useState<string>('')
   const [analysisCategory, setAnalysisCategory] = useState<string>('Все')
+  const [selectedAnalyses, setSelectedAnalyses] = useState<Record<string, boolean>>({})
+  const [compareResult, setCompareResult] = useState<{ indicators?: Record<string, { analysisId: string; date: string; value: number; unit?: string|null }[]>; insights?: string } | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,9 +158,15 @@ export default function PatientCardPage() {
                                 </div>
                               </div>
                             </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-gray-600 flex items-center gap-1">
+                                <input type="checkbox" checked={!!selectedAnalyses[a.id]} onChange={(e)=> setSelectedAnalyses(s=>({ ...s, [a.id]: e.target.checked }))} />
+                                Сравнить
+                              </label>
                             {a.documentId && (
                               <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${a.documentId}`)}>Открыть</Button>
                             )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -192,6 +200,48 @@ export default function PatientCardPage() {
               <CardDescription>Графики по ключевым индикаторам</CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Кнопка сравнения выбранных анализов */}
+              <div className="mb-3 flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={async()=>{
+                  const ids = Object.entries(selectedAnalyses).filter(([,v])=>v).map(([k])=>k)
+                  if (ids.length < 2) { alert('Выберите минимум два анализа для сравнения'); return }
+                  try {
+                    const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+                    const res = await fetch('/api/doctor/analyses/compare', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', ...(lsToken ? { Authorization: `Bearer ${lsToken}` } : {}) },
+                      credentials: 'include',
+                      body: JSON.stringify({ analysisIds: ids, patientId: patient.id })
+                    })
+                    const data = await res.json().catch(()=>({}))
+                    if (!res.ok) { alert(data?.error || 'Ошибка сравнения'); return }
+                    setCompareResult(data)
+                  } catch (e) { console.error(e); alert('Ошибка сравнения') }
+                }}>Сравнить выбранные</Button>
+                <Button size="sm" onClick={()=>{
+                  const ids = Object.entries(selectedAnalyses).filter(([,v])=>v).map(([k])=>k)
+                  if (ids.length < 2) { alert('Выберите минимум два анализа'); return }
+                  router.push(`/doctor/patients/${patient.id}/compare?ids=${encodeURIComponent(ids.join(','))}`)
+                }}>Открыть графики</Button>
+              </div>
+
+              {compareResult?.indicators && (
+                <div className="mb-6">
+                  <div className="text-sm font-medium mb-2">Сравнение выбранных анализов</div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {Object.entries(compareResult.indicators).slice(0,6).map(([name, series]) => (
+                      <div key={name} className="p-3 rounded-lg bg-white/70 border">
+                        <div className="text-sm font-medium mb-2 line-clamp-1">{name}</div>
+                        <TrendChart series={(series as any).map((p:any)=>({ date: p.date, value: p.value }))} />
+                      </div>
+                    ))}
+                  </div>
+                  {compareResult?.insights && (
+                    <div className="mt-3 p-3 rounded bg-yellow-50 border text-sm text-yellow-800 whitespace-pre-wrap">{compareResult.insights}</div>
+                  )}
+                </div>
+              )}
+
               {Object.keys(trends).length === 0 ? (
                 <div className="text-muted-foreground">Недостаточно данных для построения графиков</div>
               ) : (
