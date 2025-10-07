@@ -124,7 +124,8 @@ export default function DoctorAppointmentsPage() {
     const end = new Date(day); end.setHours(23,59,59,999)
     return appointments.filter(a => {
       const t = new Date(a.scheduledAt)
-      return t >= start && t <= end
+      // Показываем только активные записи (не отмененные)
+      return t >= start && t <= end && a.status !== 'cancelled'
     })
   }
 
@@ -288,7 +289,7 @@ export default function DoctorAppointmentsPage() {
                   ))}
                   {monthGridDays.map((d, i) => {
                     const inMonth = d.getMonth() === monthStart.getMonth()
-                    const dayEvents = eventsForDay(d)
+                    const dayEvents = eventsForDay(d) // Уже фильтрует отмененные записи
                     return (
                       <button
                         key={`d-${i}`}

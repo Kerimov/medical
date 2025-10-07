@@ -28,6 +28,8 @@ export async function PATCH(
     const appointmentId = params.id
     const body = await request.json()
     const { status, scheduledAt } = body
+    
+    console.log('PATCH appointment request:', { appointmentId, status, scheduledAt, doctorId: doctor.id })
 
     // Проверяем, что запись принадлежит этому врачу
     const appointment = await prisma.appointment.findFirst({
@@ -88,22 +90,9 @@ export async function PATCH(
       data: updateData
     })
 
-    // Записываем информацию о действии в карточку пациента
-    const actionType = status === 'cancelled' ? 'appointment_cancelled' : 'appointment_rescheduled'
-    const actionDescription = status === 'cancelled' 
-      ? `Запись отменена врачом. Дата: ${appointment.scheduledAt.toLocaleDateString('ru-RU')} в ${appointment.scheduledAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-      : `Запись перенесена врачом с ${appointment.scheduledAt.toLocaleDateString('ru-RU')} ${appointment.scheduledAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} на ${newDate.toLocaleDateString('ru-RU')} ${newDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-
-    // Добавляем запись в историю пациента
-    await prisma.patientNote.create({
-      data: {
-        patientId: appointment.patientId,
-        doctorId: doctor.id,
-        type: actionType,
-        content: actionDescription,
-        isPrivate: false
-      }
-    })
+    // TODO: В будущем можно добавить запись в историю пациента
+    // когда будет создана модель PatientNote в схеме базы данных
+    console.log(`Appointment ${appointmentId} ${status === 'cancelled' ? 'cancelled' : 'rescheduled'} by doctor ${doctor.id} for patient ${appointment.patientId}`)
 
     return NextResponse.json({ 
       message: 'Запись обновлена',
@@ -112,6 +101,14 @@ export async function PATCH(
 
   } catch (error) {
     console.error('Error updating appointment:', error)
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 })
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      appointmentId: params.id
+    })
+    return NextResponse.json({ 
+      error: 'Внутренняя ошибка сервера',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
