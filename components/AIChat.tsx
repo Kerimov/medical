@@ -13,6 +13,8 @@ interface Message {
   content: string
   timestamp: Date
   attachedDocuments?: AttachedDocument[]
+  functionResult?: any
+  functionName?: string
 }
 
 interface AttachedDocument {
@@ -27,7 +29,7 @@ export function AIChat() {
     {
       id: '1',
       role: 'assistant',
-      content: 'Здравствуйте! Я ваш персональный медицинский ассистент. Можете задавать вопросы или прикрепить медицинские документы для анализа.',
+      content: 'Здравствуйте! 👋 Я ваш персональный медицинский ассистент. Я могу помочь вам:\n\n• 📅 Записаться на прием к врачу\n• 📊 Показать результаты анализов\n• 💡 Дать персональные рекомендации\n• 👨‍⚕️ Найти подходящего врача\n• 📋 Показать ваши записи на приемы\n\nПросто скажите, что вам нужно!',
       timestamp: new Date()
     }
   ])
@@ -103,11 +105,16 @@ export function AIChat() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token')
+      
+      const response = await fetch('/api/ai/assistant', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` })
         },
+        credentials: 'include',
         body: JSON.stringify({
           message: userMessage.content,
           history: messages,
@@ -122,7 +129,9 @@ export function AIChat() {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: data.response,
-          timestamp: new Date()
+          timestamp: new Date(),
+          functionResult: data.functionResult,
+          functionName: data.functionName
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {
@@ -145,6 +154,17 @@ export function AIChat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+  }
+
+  const getFunctionLabel = (functionName: string): string => {
+    switch (functionName) {
+      case 'book_appointment': return '📅 Запись на прием'
+      case 'get_analysis_results': return '📊 Результаты анализов'
+      case 'get_recommendations': return '💡 Рекомендации'
+      case 'get_doctors': return '👨‍⚕️ Список врачей'
+      case 'get_appointments': return '📋 Записи на приемы'
+      default: return 'Функция выполнена'
     }
   }
 
@@ -213,6 +233,44 @@ export function AIChat() {
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                
+                {/* Отображение результатов функций */}
+                {message.functionResult && message.functionName && (
+                  <div className="mt-3 p-3 bg-white/50 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-xs font-medium text-green-700">
+                        {getFunctionLabel(message.functionName)}
+                      </span>
+                    </div>
+                    {message.functionName === 'book_appointment' && (
+                      <div className="text-xs text-green-600">
+                        Запись успешно создана! Проверьте раздел "Мои записи".
+                      </div>
+                    )}
+                    {message.functionName === 'get_analysis_results' && message.functionResult && (
+                      <div className="text-xs text-blue-600">
+                        Показаны последние {message.functionResult.length} анализов.
+                      </div>
+                    )}
+                    {message.functionName === 'get_recommendations' && message.functionResult && (
+                      <div className="text-xs text-purple-600">
+                        Найдено {message.functionResult.length} рекомендаций.
+                      </div>
+                    )}
+                    {message.functionName === 'get_doctors' && message.functionResult && (
+                      <div className="text-xs text-orange-600">
+                        Найдено {message.functionResult.length} врачей.
+                      </div>
+                    )}
+                    {message.functionName === 'get_appointments' && message.functionResult && (
+                      <div className="text-xs text-indigo-600">
+                        Показано {message.functionResult.length} записей.
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <p className="text-xs opacity-70 mt-1">
                   {message.timestamp.toLocaleTimeString('ru-RU', {
                     hour: '2-digit',
@@ -297,6 +355,46 @@ export function AIChat() {
         )}
 
         {/* Ввод сообщения */}
+        {/* Быстрые действия */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInput('Запиши меня на прием к врачу')}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            📅 Запись на прием
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInput('Покажи мои результаты анализов')}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            📊 Анализы
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInput('Дай мне рекомендации по здоровью')}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            💡 Рекомендации
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInput('Покажи мои записи на приемы')}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            📋 Мои записи
+          </Button>
+        </div>
+
         <div className="flex gap-2">
           <Button
             variant="outline"
