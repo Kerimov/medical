@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import { createRecommendationsForUser } from '@/lib/ai-recommendations'
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,5 +81,84 @@ export async function GET(request: NextRequest) {
       { error: 'Ошибка при получении анализов' },
       { status: 500 }
     )
+  }
+}
+
+// POST: врач создает анализ для конкретного пациента
+export async function POST(request: NextRequest) {
+  try {
+    const token = request.cookies.get('token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Токен не найден' }, { status: 401 })
+    }
+
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
+    }
+
+    // Проверяем, что пользователь является врачом
+    const doctorProfile = await prisma.doctorProfile.findUnique({
+      where: { userId: decoded.userId }
+    })
+    if (!doctorProfile) {
+      return NextResponse.json({ error: 'Профиль врача не найден' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const {
+      patientId,
+      title,
+      type,
+      date,
+      laboratory,
+      doctor,
+      results, // ожидаем JSON или объект
+      normalRange,
+      status = 'normal',
+      notes
+    } = body
+
+    if (!patientId || !title || !type || !date || !results) {
+      return NextResponse.json({ error: 'patientId, title, type, date, results обязательны' }, { status: 400 })
+    }
+
+    // Разрешаем только если пациент прикреплен к врачу или есть запись на прием
+    const [hasRecord, hasAppointment] = await Promise.all([
+      prisma.patientRecord.findFirst({ where: { doctorId: doctorProfile.id, patientId }, select: { id: true } }),
+      prisma.appointment.findFirst({ where: { doctorId: doctorProfile.id, patientId }, select: { id: true } })
+    ])
+    if (!hasRecord && !hasAppointment) {
+      return NextResponse.json({ error: 'Пациент не прикреплен к врачу' }, { status: 403 })
+    }
+
+    const analysis = await prisma.analysis.create({
+      data: {
+        userId: patientId,
+        title,
+        type,
+        date: new Date(date),
+        laboratory,
+        doctor: doctor || doctorProfile.userId,
+        results: typeof results === 'string' ? results : JSON.stringify(results),
+        normalRange,
+        status,
+        notes
+      }
+    })
+
+    // Генерируем рекомендации при отклонениях
+    if (status === 'abnormal') {
+      try {
+        await createRecommendationsForUser(patientId, analysis.id)
+      } catch (e) {
+        console.error('Doctor create analysis: recommendations error', e)
+      }
+    }
+
+    return NextResponse.json({ analysis: { ...analysis, results: JSON.parse(analysis.results) } }, { status: 201 })
+  } catch (error) {
+    console.error('Doctor create analysis error:', error)
+    return NextResponse.json({ error: 'Ошибка создания анализа' }, { status: 500 })
   }
 }

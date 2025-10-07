@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Users, Calendar, FileText, Stethoscope, Pill, NotebookPen } from 'lucide-react'
 
 interface PatientCardData {
@@ -22,6 +24,15 @@ export default function PatientCardPage() {
   const router = useRouter()
   const [data, setData] = useState<PatientCardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({
+    title: '',
+    type: '',
+    date: '',
+    laboratory: '',
+    notes: ''
+  })
+  const [resultsJson, setResultsJson] = useState<string>('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,6 +78,9 @@ export default function PatientCardPage() {
               <CardDescription>Последние результаты</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="flex justify-end mb-4">
+                <Button size="sm" onClick={() => setAdding(true)}>Добавить анализ</Button>
+              </div>
               {analyses.length === 0 ? (
                 <div className="text-muted-foreground">Анализы не найдены</div>
               ) : (
@@ -84,7 +98,9 @@ export default function PatientCardPage() {
                           </div>
                         </div>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${a.documentId || ''}`)}>Открыть</Button>
+                      {a.documentId && (
+                        <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${a.documentId}`)}>Открыть</Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -171,6 +187,75 @@ export default function PatientCardPage() {
           </Card>
         </div>
       </div>
+
+      {adding && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl glass-effect border-0 shadow-medical-lg">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Новый анализ</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setAdding(false)}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">Название</label>
+                  <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Тип</label>
+                  <Input value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Дата</label>
+                  <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Лаборатория</label>
+                  <Input value={form.laboratory} onChange={e => setForm({ ...form, laboratory: e.target.value })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-muted-foreground">Результаты (JSON)</label>
+                  <Textarea rows={6} value={resultsJson} onChange={e => setResultsJson(e.target.value)} placeholder='[{"name":"Гемоглобин","value":130,"unit":"г/л","isNormal":true}]' />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-muted-foreground">Заметки</label>
+                  <Textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => setAdding(false)}>Отмена</Button>
+                <Button onClick={async () => {
+                  try {
+                    const res = await fetch('/api/doctor/analyses', {
+                      method: 'POST',
+                      credentials: 'include',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        patientId: patient.id,
+                        title: form.title,
+                        type: form.type,
+                        date: form.date,
+                        laboratory: form.laboratory,
+                        notes: form.notes,
+                        results: resultsJson || '[]'
+                      })
+                    })
+                    if (res.ok) {
+                      const created = await res.json()
+                      setData({ ...data, analyses: [created.analysis, ...analyses] })
+                      setAdding(false)
+                      setForm({ title: '', type: '', date: '', laboratory: '', notes: '' })
+                      setResultsJson('')
+                    }
+                  } catch {}
+                }}>Сохранить</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
