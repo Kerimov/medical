@@ -33,8 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const token = Cookies.get('token')
-      console.log('Checking auth, token from cookies:', token ? 'present' : 'missing')
+      // Пытаемся восстановить токен из cookie, если нет — из localStorage
+      let token = Cookies.get('token') || null
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      if (!token && lsToken) {
+        token = lsToken
+        // ре-гидрируем cookie, чтобы API без заголовков тоже работал
+        Cookies.set('token', lsToken, { sameSite: 'lax' })
+      }
+      console.log('Checking auth, token from cookies/localStorage:', token ? 'present' : 'missing')
       
       if (!token) {
         setIsLoading(false)
@@ -51,15 +58,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json()
         setUser(data.user)
         setToken(token)
+        // дублируем в localStorage для устойчивости после перезагрузки
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('token', token)
+        }
         console.log('Auth successful, token set:', token ? 'present' : 'missing')
       } else {
         console.log('Auth failed, removing token')
         Cookies.remove('token')
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token')
+        }
         setToken(null)
       }
     } catch (error) {
       console.error('Auth check error:', error)
       Cookies.remove('token')
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+      }
       setToken(null)
     } finally {
       setIsLoading(false)
@@ -83,6 +100,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUser(data.user)
     setToken(data.token)
+    // сохраняем токен в cookie и localStorage для восстановления после обновления
+    Cookies.set('token', data.token, { sameSite: 'lax' })
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', data.token)
+    }
   }
 
   const register = async (email: string, password: string, name: string) => {
@@ -106,6 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     Cookies.remove('token')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token')
+    }
     setUser(null)
     setToken(null)
   }

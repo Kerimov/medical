@@ -30,26 +30,28 @@ export async function performOCRSpace(imageBase64: string): Promise<OCRSpaceResu
     
     const data = await response.json()
     
-    // Даже если есть ошибка, проверяем, был ли распознан хоть какой-то текст
-    const text = data.ParsedResults?.[0]?.ParsedText || ''
-    const exitCode = data.ParsedResults?.[0]?.FileParseExitCode || 0
+    // Собираем текст со всех страниц, если их несколько
+    const results: any[] = Array.isArray(data.ParsedResults) ? data.ParsedResults : []
+    const combinedText = results.map(r => r?.ParsedText || '').join('\n')
+    const exitCodes = results.map(r => r?.FileParseExitCode).filter((c: any) => typeof c !== 'undefined')
+    const exitCode = exitCodes.length > 0 ? exitCodes.every((c: number) => c === 1) ? 1 : 0 : 0
     
-    if (data.IsErroredOnProcessing && text.length === 0) {
+    if (data.IsErroredOnProcessing && combinedText.length === 0) {
       const errorMsg = data.ErrorMessage?.[0] || data.ErrorDetails || 'OCR processing failed'
       logger.error('OCR processing error', 'OCR.space', { error: errorMsg })
       throw new Error(errorMsg)
     }
     
     // Если есть текст, считаем это успехом (даже если были warnings)
-    if (text.length > 0) {
-      logger.info('Recognition completed', 'OCR.space', { exitCode, textLength: text.length })
+    if (combinedText.length > 0) {
+      logger.info('Recognition completed', 'OCR.space', { exitCode, textLength: combinedText.length, pages: results.length })
       
       if (data.IsErroredOnProcessing) {
         logger.warn('Partial OCR success', 'OCR.space', { warning: data.ErrorMessage?.[0] || 'Partial success' })
       }
       
       return {
-        text: text,
+        text: combinedText,
         confidence: exitCode === 1 ? 0.85 : 0.70 // Оценочная уверенность
       }
     }

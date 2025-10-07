@@ -157,6 +157,21 @@ async function processDocumentOCR(documentId: string) {
           console.warn('[OCR] ⚠️ AI parsing failed, falling back to regex parser:', aiError)
           medicalData = parseMedicalData(ocrResult.text)
         }
+        // Дополнительный шаг: объединяем с regex-результатами, чтобы добрать пропущенные показатели
+        try {
+          const regexData = parseMedicalData(ocrResult.text)
+          if (regexData?.indicators?.length) {
+            const byName = new Map<string, any>()
+            ;(medicalData?.indicators || []).forEach((i: any) => i?.name && byName.set(i.name.toLowerCase(), i))
+            regexData.indicators.forEach((i: any) => {
+              const key = i?.name?.toLowerCase()
+              if (key && !byName.has(key)) byName.set(key, i)
+            })
+            medicalData.indicators = Array.from(byName.values())
+          }
+        } catch (mergeErr) {
+          console.warn('[OCR] Unable to merge AI and regex indicators:', mergeErr)
+        }
       } else {
         // 📝 REGEX-ПАРСЕР: Базовое распознавание (работает только с некоторыми форматами)
         console.log('[OCR] No AI config found, using regex parser')
@@ -239,6 +254,22 @@ async function processDocumentOCR(documentId: string) {
               console.warn('[OCR] AI parsing after Vision failed, fallback to regex:', aiParseErr)
               const { parseMedicalData } = await import('@/lib/ocr')
               medicalData = parseMedicalData(extractedText)
+            }
+
+            // Аналогично объединяем показатели с regex-парсером, чтобы добрать пропущенные
+            try {
+              const regexData = parseMedicalData(extractedText)
+              if (regexData?.indicators?.length) {
+                const byName = new Map<string, any>()
+                ;(medicalData?.indicators || []).forEach((i: any) => i?.name && byName.set(i.name.toLowerCase(), i))
+                regexData.indicators.forEach((i: any) => {
+                  const key = i?.name?.toLowerCase()
+                  if (key && !byName.has(key)) byName.set(key, i)
+                })
+                medicalData.indicators = Array.from(byName.values())
+              }
+            } catch (mergeErr) {
+              console.warn('[OCR] Unable to merge AI and regex indicators (vision):', mergeErr)
             }
 
             try {

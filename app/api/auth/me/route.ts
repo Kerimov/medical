@@ -4,16 +4,23 @@ import { verifyToken } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    // 1) Пробуем получить токен из заголовка Authorization
     const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Не авторизован' },
-        { status: 401 }
-      )
+    let token: string | undefined
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
     }
 
-    const token = authHeader.substring(7)
+    // 2) Если заголовка нет — пробуем cookie `token` (работает с httpOnly)
+    if (!token) {
+      const cookieToken = request.cookies.get('token')?.value
+      if (cookieToken) token = cookieToken
+    }
+
+    if (!token) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    }
+
     const payload = verifyToken(token)
 
     if (!payload) {

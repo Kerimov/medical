@@ -4,14 +4,19 @@ import { verifyToken } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    // Проверяем токен
+    // Проверяем токен: сначала из заголовка, затем из cookie
     const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token: string | undefined
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
+    }
+    if (!token) {
+      const cookieToken = request.cookies.get('token')?.value
+      if (cookieToken) token = cookieToken
+    }
+    if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {
@@ -49,14 +54,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Проверяем токен
+    // Проверяем токен: сначала из заголовка, затем из cookie
     const authHeader = request.headers.get('authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    let token: string | undefined
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7)
+    }
+    if (!token) {
+      const cookieToken = request.cookies.get('token')?.value
+      if (cookieToken) token = cookieToken
+    }
+    if (!token) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
 
     const decoded = verifyToken(token)
     if (!decoded) {

@@ -16,20 +16,26 @@ export function Header() {
 
   // Проверяем, является ли пользователь врачом
   React.useEffect(() => {
-    if (user) {
-      checkDoctorStatus()
+    // Если у пользователя роль DOCTOR — показываем пункт меню "Врач"
+    // Проверку профиля врача делаем отдельно на соответствующих страницах
+    if (user?.role === 'DOCTOR') {
+      setIsDoctor(true)
+    } else {
+      setIsDoctor(false)
     }
   }, [user])
 
   const checkDoctorStatus = async () => {
+    // Оставлено для совместимости: можно вызвать при переходе в раздел врача,
+    // чтобы проверить, создан ли профиль и управлять онбордингом.
     try {
-      const response = await fetch('/api/doctor/profile', {
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const token = lsToken || undefined
+      await fetch('/api/doctor/profile', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: 'include'
       })
-      setIsDoctor(response.ok)
-    } catch (error) {
-      setIsDoctor(false)
-    }
+    } catch {}
   }
 
   const handleLogout = () => {
