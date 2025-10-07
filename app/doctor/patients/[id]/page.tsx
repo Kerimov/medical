@@ -26,6 +26,9 @@ export default function PatientCardPage() {
   const [adding, setAdding] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedFileName, setSelectedFileName] = useState<string>('')
+  const [trends, setTrends] = useState<Record<string, { date: string; value: number; referenceMin?: number | null; referenceMax?: number | null; isNormal?: boolean | null }[]>>({})
+  const [insights, setInsights] = useState<string>('')
+  const [analysisCategory, setAnalysisCategory] = useState<string>('Все')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +44,39 @@ export default function PatientCardPage() {
     }
     fetchData()
   }, [params.id])
+
+  useEffect(() => {
+    const loadTrends = async () => {
+      try {
+        const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+        const [tr, ai] = await Promise.all([
+          fetch(`/api/doctor/analyses/trends?patientId=${params.id}`, { headers: lsToken ? { Authorization: `Bearer ${lsToken}` } : undefined, credentials: 'include' }).then(r=>r.json()).catch(()=>({})),
+          fetch(`/api/doctor/analyses/insights?patientId=${params.id}`, { headers: lsToken ? { Authorization: `Bearer ${lsToken}` } : undefined, credentials: 'include' }).then(r=>r.json()).catch(()=>({}))
+        ])
+        if (tr?.indicators && typeof tr.indicators === 'object') setTrends(tr.indicators)
+        if (typeof ai?.insights === 'string') setInsights(ai.insights)
+      } catch {}
+    }
+    loadTrends()
+  }, [params.id])
+
+  function TrendChart({ series }: { series: { date: string; value: number }[] }) {
+    if (!series || series.length === 0) return null
+    const points = series.map(p => ({ x: new Date(p.date).getTime(), y: p.value }))
+    const xs = points.map(p => p.x), ys = points.map(p => p.y)
+    const minX = Math.min(...xs), maxX = Math.max(...xs)
+    const minY = Math.min(...ys), maxY = Math.max(...ys)
+    const pad = 8, w = 260, h = 120
+    const sx = (x:number) => pad + (w - 2*pad) * (maxX === minX ? 0.5 : (x - minX) / (maxX - minX))
+    const sy = (y:number) => h - pad - (h - 2*pad) * (maxY === minY ? 0.5 : (y - minY) / (maxY - minY))
+    const path = points.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')
+    return (
+      <svg width={260} height={120} className="bg-white rounded border">
+        <path d={path} fill="none" stroke="#2563eb" strokeWidth={2} />
+        {points.map((p,i)=>(<circle key={i} cx={sx(p.x)} cy={sy(p.y)} r={2.5} fill="#2563eb" />))}
+      </svg>
+    )
+  }
 
   if (loading) {
     return (
@@ -71,29 +107,61 @@ export default function PatientCardPage() {
               <CardDescription>Последние результаты</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex justify-end mb-4">
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <div className="text-sm text-muted-foreground">Категория</div>
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={analysisCategory}
+                  onChange={e => setAnalysisCategory(e.target.value)}
+                >
+                  {['Все', ...Array.from(new Set(analyses.map((a:any)=>a.type || 'прочее')))].map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <div className="flex-1" />
                 <Button size="sm" onClick={() => { setAdding(true) }}>Добавить анализ</Button>
               </div>
               {analyses.length === 0 ? (
                 <div className="text-muted-foreground">Анализы не найдены</div>
               ) : (
-                <div className="space-y-3">
-                  {analyses.slice(0, 6).map((a) => (
-                    <div key={a.id} className="p-3 rounded-lg bg-white/70 border flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white flex items-center justify-center">
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{a.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {a.document?.laboratory || 'Лаборатория —'} · {new Date(a.date).toLocaleDateString('ru-RU')}
+                <div className="space-y-5">
+                  {Object.entries(
+                    analyses
+                      .filter((a:any)=> analysisCategory==='Все' ? true : (a.type || 'прочее')===analysisCategory)
+                      .reduce((acc: Record<string, any[]>, a: any) => {
+                        const key = new Date(a.date).toLocaleDateString('ru-RU')
+                        if (!acc[key]) acc[key] = []
+                        acc[key].push(a)
+                        return acc
+                      }, {})
+                  ).sort((a,b)=>{
+                    // sort dates desc
+                    const da = a[0].split('.').reverse().join('-')
+                    const db = b[0].split('.').reverse().join('-')
+                    return db.localeCompare(da)
+                  }).map(([dateLabel, items]) => (
+                    <div key={dateLabel}>
+                      <div className="text-xs font-medium text-gray-500 mb-2">{dateLabel}</div>
+                      <div className="space-y-3">
+                        {items.map((a:any)=> (
+                          <div key={a.id} className="p-3 rounded-lg bg-white/70 border flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white flex items-center justify-center">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <div className="font-medium">{a.title}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {(a.type || 'Категория')} · {a.document?.laboratory || 'Лаборатория —'}
+                                </div>
+                              </div>
+                            </div>
+                            {a.documentId && (
+                              <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${a.documentId}`)}>Открыть</Button>
+                            )}
                           </div>
-                        </div>
+                        ))}
                       </div>
-                      {a.documentId && (
-                        <Button size="sm" variant="outline" onClick={() => router.push(`/documents/${a.documentId}`)}>Открыть</Button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -118,6 +186,38 @@ export default function PatientCardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <Card className="glass-effect border-0 shadow-medical lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Динамика показателей</CardTitle>
+              <CardDescription>Графики по ключевым индикаторам</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(trends).length === 0 ? (
+                <div className="text-muted-foreground">Недостаточно данных для построения графиков</div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {Object.entries(trends).slice(0, 6).map(([name, series]) => (
+                    <div key={name} className="p-3 rounded-lg bg-white/70 border">
+                      <div className="text-sm font-medium mb-2 line-clamp-1">{name}</div>
+                      <TrendChart series={series as any} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle>AI-анализ динамики</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="whitespace-pre-wrap text-sm text-gray-700">
+                {insights || 'Аналитика в процессе или данных пока недостаточно.'}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="glass-effect border-0 shadow-medical lg:col-span-2">
             <CardHeader>
               <CardTitle>Рекомендации</CardTitle>
