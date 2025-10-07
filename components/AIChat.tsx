@@ -360,11 +360,20 @@ export function AIChat() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setInput('Запиши меня на прием к врачу')}
+            onClick={() => setInput('Хочу записаться на прием')}
             disabled={isLoading}
             className="text-xs"
           >
             📅 Запись на прием
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInput('Покажи список врачей')}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            👨‍⚕️ Врачи
           </Button>
           <Button
             variant="outline"
@@ -374,15 +383,6 @@ export function AIChat() {
             className="text-xs"
           >
             📊 Анализы
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setInput('Дай мне рекомендации по здоровью')}
-            disabled={isLoading}
-            className="text-xs"
-          >
-            💡 Рекомендации
           </Button>
           <Button
             variant="outline"

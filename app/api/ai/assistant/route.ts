@@ -170,8 +170,20 @@ export async function POST(request: NextRequest) {
 async function analyzeMessageAndDetermineFunction(message: string, userId: string) {
   const lowerMessage = message.toLowerCase()
   
-  // Запись на прием
-  if (lowerMessage.match(/записать|записаться|запись.*прием|прием.*врач|когда.*врач/)) {
+  // Запись на прием - сначала показываем список врачей
+  if (lowerMessage.match(/записать|записаться|запись.*прием|прием.*врач|когда.*врач/) && 
+      !lowerMessage.match(/\d{1,2}:\d{2}/) && // Нет времени
+      !lowerMessage.match(/\d{1,2}[.\-/]\d{1,2}/)) { // Нет даты
+    // Если нет конкретной даты/времени, показываем список врачей
+    return {
+      name: 'get_doctors',
+      parameters: await extractDoctorParameters(message)
+    }
+  }
+  
+  // Запись на прием с конкретными параметрами
+  if (lowerMessage.match(/записать|записаться|запись.*прием/) && 
+      (lowerMessage.match(/\d{1,2}:\d{2}/) || lowerMessage.match(/\d{1,2}[.\-/]\d{1,2}/))) {
     return {
       name: 'book_appointment',
       parameters: await extractAppointmentParameters(message, userId)
@@ -218,19 +230,23 @@ async function extractAppointmentParameters(message: string, userId: string) {
   const params: any = {}
   
   // Попытка извлечь дату
-  const dateMatch = message.match(/(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})|(завтра|послезавтра|сегодня)/)
+  const dateMatch = message.match(/(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?|(завтра|послезавтра|сегодня)/)
   if (dateMatch) {
-    if (dateMatch[2]) {
+    if (dateMatch[4]) {
+      // Относительная дата (завтра, послезавтра, сегодня)
       const today = new Date()
-      if (dateMatch[2] === 'завтра') {
+      if (dateMatch[4] === 'завтра') {
         today.setDate(today.getDate() + 1)
-      } else if (dateMatch[2] === 'послезавтра') {
+      } else if (dateMatch[4] === 'послезавтра') {
         today.setDate(today.getDate() + 2)
       }
       params.date = today.toISOString().split('T')[0]
-    } else {
-      // Простое преобразование даты
-      params.date = new Date().toISOString().split('T')[0] // По умолчанию сегодня
+    } else if (dateMatch[1] && dateMatch[2]) {
+      // Конкретная дата (дд.мм или дд.мм.гггг)
+      const day = dateMatch[1].padStart(2, '0')
+      const month = dateMatch[2].padStart(2, '0')
+      const year = dateMatch[3] || new Date().getFullYear().toString()
+      params.date = `${year.length === 2 ? '20' + year : year}-${month}-${day}`
     }
   } else {
     params.date = new Date().toISOString().split('T')[0]
@@ -257,15 +273,46 @@ async function extractAppointmentParameters(message: string, userId: string) {
     params.appointmentType = 'consultation'
   }
   
-  // Получаем первого доступного врача
+  // Попытка извлечь ФИО врача из сообщения
   try {
-    const doctors = await prisma.doctorProfile.findMany({
-      include: { user: true },
-      take: 1
-    })
+    // Ищем паттерны типа "к [ФИО]" или "врачу [ФИО]"
+    const doctorNameMatch = message.match(/(?:к|врачу)\s+([А-ЯЁа-яё]+(?:\s+[А-ЯЁа-яё]+){1,3})/i)
     
-    if (doctors.length > 0) {
-      params.doctorId = doctors[0].id
+    if (doctorNameMatch) {
+      const doctorName = doctorNameMatch[1].trim()
+      console.log('[AI-ASSISTANT] Searching for doctor by name:', doctorName)
+      
+      // Ищем врача по имени (частичное совпадение)
+      const doctors = await prisma.doctorProfile.findMany({
+        include: { user: true },
+        take: 10
+      })
+      
+      const foundDoctor = doctors.find(d => 
+        d.user.name.toLowerCase().includes(doctorName.toLowerCase()) ||
+        doctorName.toLowerCase().includes(d.user.name.toLowerCase())
+      )
+      
+      if (foundDoctor) {
+        params.doctorId = foundDoctor.id
+        console.log('[AI-ASSISTANT] Doctor found by name:', foundDoctor.user.name)
+      } else {
+        console.log('[AI-ASSISTANT] Doctor not found by name, using first available')
+        // Если не нашли по имени, берем первого доступного
+        if (doctors.length > 0) {
+          params.doctorId = doctors[0].id
+        }
+      }
+    } else {
+      // Если ФИО не указано, берем первого доступного врача
+      const doctors = await prisma.doctorProfile.findMany({
+        include: { user: true },
+        take: 1
+      })
+      
+      if (doctors.length > 0) {
+        params.doctorId = doctors[0].id
+      }
     }
   } catch (dbError) {
     console.error('[AI-ASSISTANT] Database error in extractAppointmentParameters:', dbError)
@@ -622,14 +669,20 @@ async function getDoctors(params: any) {
     let message = `👨‍⚕️ Доступные врачи:\n\n`
     
     doctors.forEach((doctor, index) => {
-      message += `${index + 1}. ${doctor.user.name}\n`
+      message += `${index + 1}. **${doctor.user.name}**\n`
       message += `   🏥 Специализация: ${doctor.specialization}\n`
-      message += `   📧 Email: ${doctor.user.email}\n`
       if (doctor.phone) {
         message += `   📞 Телефон: ${doctor.phone}\n`
       }
       message += `\n`
     })
+    
+    message += `\n📅 Для записи на прием напишите:\n`
+    message += `"Запиши меня к [ФИО врача] на [дата] в [время]"\n\n`
+    message += `Например:\n`
+    message += `• "Запиши меня к ${doctors[0].user.name} на завтра в 14:00"\n`
+    message += `• "Запиши меня к ${doctors[0].user.name} на 10.10 в 10:00"\n`
+    message += `• "Запиши меня к ${doctors[0].user.name} на послезавтра в 15:30"`
     
     return {
       message,
