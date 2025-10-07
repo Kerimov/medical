@@ -174,7 +174,12 @@ export default function DoctorAnalyses() {
                   <div className="flex items-center space-x-2">
                     <Badge className={getStatusColor(analysis.status)}>
                       {getStatusIcon(analysis.status)}
-                      <span className="ml-1">{analysis.status}</span>
+                      <span className="ml-1">
+                        {analysis.status === 'normal' ? 'Норма' : 
+                         analysis.status === 'abnormal' ? 'Отклонение' : 
+                         analysis.status === 'critical' ? 'Критично' : 
+                         analysis.status}
+                      </span>
                     </Badge>
                   </div>
                 </div>

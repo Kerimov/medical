@@ -188,7 +188,15 @@ export default function DashboardPage() {
                           <TableCell>{new Date(a.scheduledAt).toLocaleDateString('ru-RU')}</TableCell>
                           <TableCell>{new Date(a.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</TableCell>
                           <TableCell>{a.doctorName || a.doctor?.fullName || '—'}</TableCell>
-                          <TableCell>{a.status ? String(a.status).toLowerCase() : 'запланирован'}</TableCell>
+                          <TableCell>
+                            {a.status === 'scheduled' ? 'Запланировано' :
+                             a.status === 'confirmed' ? 'Подтверждено' :
+                             a.status === 'completed' ? 'Завершено' :
+                             a.status === 'cancelled' ? 'Отменено' :
+                             a.status === 'rescheduled' ? 'Перенесено' :
+                             a.status === 'no_show' ? 'Не явился' :
+                             'Запланировано'}
+                          </TableCell>
                           <TableCell className="text-right">
                             <Link href="/my-appointments" className="text-primary hover:underline">Открыть</Link>
                           </TableCell>

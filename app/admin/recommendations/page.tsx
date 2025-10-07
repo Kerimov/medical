@@ -268,7 +268,7 @@ export default function AdminRecommendationsPage() {
                             variant={rec.status === 'ACTIVE' ? "default" : "secondary"}
                             className={rec.status === 'ACTIVE' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
                           >
-                            {rec.status}
+                            {rec.status === 'ACTIVE' ? 'Активна' : rec.status === 'INACTIVE' ? 'Неактивна' : rec.status}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -373,7 +373,7 @@ export default function AdminRecommendationsPage() {
                             variant={selectedRecommendation.status === 'ACTIVE' ? "default" : "secondary"}
                             className={`ml-2 ${selectedRecommendation.status === 'ACTIVE' ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
                           >
-                            {selectedRecommendation.status}
+                            {selectedRecommendation.status === 'ACTIVE' ? 'Активна' : selectedRecommendation.status === 'INACTIVE' ? 'Неактивна' : selectedRecommendation.status}
                           </Badge>
                         </p>
                         <p className="text-sm">

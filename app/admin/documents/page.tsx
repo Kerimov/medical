@@ -366,7 +366,7 @@ export default function AdminDocumentsPage() {
                             <div className="flex-1">
                               <p className="font-semibold">{analysis.title}</p>
                               <p className="text-sm text-muted-foreground">
-                                Статус: {analysis.status} • {new Date(analysis.createdAt).toLocaleDateString('ru-RU')}
+                                Статус: {analysis.status === 'normal' ? 'Норма' : analysis.status === 'abnormal' ? 'Отклонение' : analysis.status === 'critical' ? 'Критично' : analysis.status} • {new Date(analysis.createdAt).toLocaleDateString('ru-RU')}
                               </p>
                             </div>
                           </div>

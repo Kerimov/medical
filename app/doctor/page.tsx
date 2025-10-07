@@ -244,7 +244,7 @@ export default function DoctorDashboard() {
                         </div>
                       </div>
                       <Badge variant={patient.status === 'active' ? 'default' : 'secondary'}>
-                        {patient.status}
+                        {patient.status === 'active' ? 'Активен' : patient.status === 'completed' ? 'Завершен' : patient.status === 'cancelled' ? 'Отменен' : patient.status}
                       </Badge>
                     </div>
                   ))}
