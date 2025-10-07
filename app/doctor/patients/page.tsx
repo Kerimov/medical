@@ -64,8 +64,9 @@ export default function DoctorPatients() {
       })
       
       if (response.ok) {
-        const data = await response.json()
-        setPatients(data)
+        const data = await response.json().catch(() => ({}))
+        const list = Array.isArray(data) ? data : Array.isArray(data?.patients) ? data.patients : []
+        setPatients(list)
       } else {
         console.error('Error fetching patients:', response.status)
       }
