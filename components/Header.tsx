@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Menu, User, Bell, Settings, Shield, Stethoscope } from 'lucide-react'
+import { Menu, User, Bell, Settings, Shield, Stethoscope, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -57,33 +57,27 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-1 text-sm font-medium">
-          <Link href="/" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
-            Главная
-          </Link>
-          {user && (
+          {!isDoctor && (
             <>
-              <Link href="/dashboard" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
-                Документы
-              </Link>
-              <Link href="/analyses" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
-                Анализы
-              </Link>
-              <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">
-                Рекомендации
-              </Link>
-              {isDoctor && (
-                <Link href="/doctor" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
-                  <Stethoscope className="w-4 h-4" />
-                  Врач
-                </Link>
-              )}
-              {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
-                <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
-                  <Shield className="h-4 w-4" />
-                  Админ
-                </Link>
+              <Link href="/" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Главная</Link>
+              {user && (
+                <>
+                  <Link href="/dashboard" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Документы</Link>
+                  <Link href="/analyses" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Анализы</Link>
+                  <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Рекомендации</Link>
+                </>
               )}
             </>
+          )}
+          <Button variant="outline" className="ml-2" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Назад
+          </Button>
+          {/* Ссылка "Врач" скрыта: достаточно кнопки "Личный кабинет" */}
+          {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+            <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
+              <Shield className="h-4 w-4" />
+              Админ
+            </Link>
           )}
         </nav>
 
@@ -149,46 +143,25 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t glass-effect">
           <nav className="container flex flex-col space-y-2 py-4 animate-slide-up">
-            <Link 
-              href="/" 
-              className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Главная
-            </Link>
+            {!isDoctor && (
+              <Link 
+                href="/" 
+                className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Главная
+              </Link>
+            )}
             {user && (
               <>
-                <Link 
-                  href="/dashboard" 
-                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Документы
-                </Link>
-                <Link 
-                  href="/analyses" 
-                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Анализы
-                </Link>
-                <Link 
-                  href="/marketplace" 
-                  className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Рекомендации
-                </Link>
-                {isDoctor && (
-                  <Link 
-                    href="/doctor" 
-                    className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Stethoscope className="h-4 w-4" />
-                    Врач
-                  </Link>
+                {!isDoctor && (
+                  <>
+                    <Link href="/dashboard" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Документы</Link>
+                    <Link href="/analyses" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Анализы</Link>
+                    <Link href="/marketplace" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Рекомендации</Link>
+                  </>
                 )}
+                {/* Ссылка "Врач" скрыта в мобильном меню */}
                 <Link 
                   href="/reminders" 
                   className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
@@ -214,6 +187,9 @@ export function Header() {
               {!isLoading && (
                 user ? (
                   <>
+                    <Button variant="outline" className="w-full" onClick={() => { router.back(); setMobileMenuOpen(false) }}>
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Назад
+                    </Button>
                     <Link href={isDoctor ? "/doctor" : "/dashboard"} onClick={() => setMobileMenuOpen(false)}>
                       <Button className="w-full gradient-primary text-white">
                         <User className="mr-2 h-4 w-4" />
