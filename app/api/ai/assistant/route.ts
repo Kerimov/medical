@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
-
-const prisma = new PrismaClient()
 
 // Определяем функции, которые может выполнять AI ассистент
 const availableFunctions = {
@@ -76,6 +74,11 @@ const availableFunctions = {
 export async function POST(request: NextRequest) {
   try {
     console.log('[AI-ASSISTANT] Starting request processing')
+    console.log('[AI-ASSISTANT] Prisma client status:', { 
+      isPrismaAvailable: !!prisma,
+      hasDoctorProfileModel: !!prisma?.doctorProfile,
+      prismaType: typeof prisma 
+    })
     
     const { message, history } = await request.json()
     console.log('[AI-ASSISTANT] Request data:', { message: message?.substring(0, 100), hasHistory: !!history })
@@ -256,7 +259,7 @@ async function extractAppointmentParameters(message: string, userId: string) {
   
   // Получаем первого доступного врача
   try {
-    const doctors = await prisma.doctor.findMany({
+    const doctors = await prisma.doctorProfile.findMany({
       include: { user: true },
       take: 1
     })
@@ -390,10 +393,20 @@ async function executeFunction(functionCall: any, userId: string) {
 async function bookAppointment(params: any, userId: string) {
   try {
     console.log('[AI-ASSISTANT] bookAppointment called with params:', params)
+    console.log('[AI-ASSISTANT] Prisma availability check:', { 
+      hasPrisma: !!prisma,
+      hasDoctorProfileModel: !!prisma?.doctorProfile,
+      doctorProfileModelType: typeof prisma?.doctorProfile
+    })
+    
+    if (!prisma || !prisma.doctorProfile) {
+      throw new Error('Prisma client not initialized properly')
+    }
+    
     const { doctorId, appointmentType, date, time, notes } = params
     
     // Проверяем, что врач существует
-    const doctor = await prisma.doctor.findUnique({
+    const doctor = await prisma.doctorProfile.findUnique({
       where: { id: doctorId },
       include: { user: true }
     })
@@ -401,14 +414,26 @@ async function bookAppointment(params: any, userId: string) {
     
     if (!doctorId) {
       return {
-        message: 'Не удалось найти доступного врача. Попробуйте позже или обратитесь в регистратуру.',
+        message: '⚠️ В системе пока нет зарегистрированных врачей.\n\n💡 Чтобы записаться на прием:\n1. Администратор должен создать учетную запись врача через Prisma Studio (http://localhost:5555)\n2. Или позвоните в регистратуру для записи\n\n📞 Телефон регистратуры: +7 (999) 123-45-67\n\n🔧 Для администратора:\n• Откройте http://localhost:5555\n• Создайте пользователя с ролью DOCTOR\n• Создайте запись в таблице DoctorProfile с userId этого пользователя',
         data: null
       }
     }
 
     if (!doctor) {
       return {
-        message: 'Врач не найден. Пожалуйста, выберите другого врача.',
+        message: '⚠️ Указанный врач не найден в системе.\n\nПопробуйте:\n• "Покажи список врачей"\n• "Найди терапевта"\n• Или позвоните в регистратуру для записи',
+        data: null
+      }
+    }
+    
+    // Получаем информацию о пациенте
+    const patient = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+    
+    if (!patient) {
+      return {
+        message: '⚠️ Не удалось найти информацию о пациенте.',
         data: null
       }
     }
@@ -420,6 +445,8 @@ async function bookAppointment(params: any, userId: string) {
       data: {
         doctorId,
         patientId: userId,
+        patientName: patient.name,
+        patientEmail: patient.email,
         appointmentType,
         scheduledAt,
         duration: 30,
@@ -438,8 +465,19 @@ async function bookAppointment(params: any, userId: string) {
       data: appointment
     }
   } catch (error) {
+    console.error('[AI-ASSISTANT] Error in bookAppointment:', error)
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
+    if (errorMessage.includes('Unique constraint')) {
+      return {
+        message: '⚠️ Выбранное время уже занято.\n\nПопробуйте:\n• Выбрать другое время\n• "Покажи свободные слоты на завтра"\n• Позвонить в регистратуру для уточнения расписания',
+        data: null
+      }
+    }
+    
     return {
-      message: 'Не удалось создать запись на прием. Возможно, выбранное время уже занято или произошла ошибка.',
+      message: `⚠️ Не удалось создать запись на прием.\n\n🔍 Причина: ${errorMessage}\n\n💡 Попробуйте:\n• Указать конкретную дату и время\n• Проверить, что врач доступен\n• Позвонить в регистратуру`,
       data: null
     }
   }
@@ -568,7 +606,7 @@ async function getDoctors(params: any) {
       }
     }
     
-    const doctors = await prisma.doctor.findMany({
+    const doctors = await prisma.doctorProfile.findMany({
       where: whereClause,
       include: { user: true },
       take: 10
