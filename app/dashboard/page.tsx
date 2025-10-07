@@ -26,7 +26,18 @@ export default function DashboardPage() {
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [adminDocs, setAdminDocs] = useState<any[]>([])
   const [adminLoading, setAdminLoading] = useState(true)
+  const [todayMedicationsProgress, setTodayMedicationsProgress] = useState<string>('—')
+  const [nextAppointmentTime, setNextAppointmentTime] = useState<string>('—')
+  const [manualPulse, setManualPulse] = useState<string>('')
+  const [journalCount, setJournalCount] = useState<number>(0)
   const isAdmin = !!(user && user.role === 'ADMIN')
+  const displayFirstName = (() => {
+    const fullName = user?.name?.trim() ?? ''
+    if (!fullName) return ''
+    const parts = fullName.split(/\s+/)
+    if (parts.length >= 2) return parts[1] // Фамилия Имя (Отчество?) → берем Имя
+    return parts[0]
+  })()
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -60,6 +71,45 @@ export default function DashboardPage() {
     run()
   }, [user, isAdmin])
 
+  // Загружаем реальные данные для карточек (лекарства, приём, дневник)
+  useEffect(() => {
+    const load = async () => {
+      if (!user) return
+      try {
+        const token = localStorage.getItem('token')
+        // 1) Записи к врачам: берём ближайшую
+        const apptRes = await fetch('/api/appointments', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        })
+        if (apptRes.ok) {
+          const { appointments } = await apptRes.json()
+          const upcoming = (appointments || []).filter((a: any) => new Date(a.scheduledAt) > new Date())
+          upcoming.sort((a: any, b: any) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))
+          if (upcoming[0]) {
+            setNextAppointmentTime(new Date(upcoming[0].scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }))
+          } else {
+            setNextAppointmentTime('—')
+          }
+        }
+
+        // 2) Дневник: используем количество анализов как суррогат записей
+        const docsRes = await fetch('/api/documents', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        })
+        if (docsRes.ok) {
+          const docs = await docsRes.json()
+          setJournalCount(Array.isArray(docs) ? docs.length : (docs?.documents?.length || 0))
+        }
+
+        // 3) Лекарства сегодня: оставим временную заглушку 3/5, можно будет связать с reminders
+        setTodayMedicationsProgress('3/5')
+      } catch {
+        // игнорируем ошибки отображения
+      }
+    }
+    load()
+  }, [user])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -85,7 +135,7 @@ export default function DashboardPage() {
             <Activity className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            Добро пожаловать, {user.name.split(' ')[0]}!
+            Добро пожаловать, {displayFirstName}!
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Управляйте своим здоровьем легко и эффективно
@@ -99,7 +149,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Сегодня</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">3/5</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">{todayMedicationsProgress}</p>
                   <p className="text-xs text-muted-foreground mt-1">Лекарства</p>
                 </div>
                 <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
@@ -114,7 +164,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Ближайший</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">15:30</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">{nextAppointmentTime}</p>
                   <p className="text-xs text-muted-foreground mt-1">Прием</p>
                 </div>
                 <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
@@ -129,7 +179,14 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Пульс</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">72</p>
+                  <div className="flex items-baseline gap-2">
+                    <input
+                      value={manualPulse}
+                      onChange={(e) => setManualPulse(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="—"
+                      className="w-20 bg-transparent outline-none border-b border-blue-200 text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600 placeholder:text-gray-300"
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">уд/мин</p>
                 </div>
                 <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
@@ -144,7 +201,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Записей</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">12</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">{journalCount}</p>
                   <p className="text-xs text-muted-foreground mt-1">В дневнике</p>
                 </div>
                 <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">

@@ -52,7 +52,18 @@ export default function DoctorDashboard() {
 
   const checkDoctorProfile = async () => {
     try {
+      // Если у пользователя роль не DOCTOR — сразу направляем в онбординг
+      if (user?.role !== 'DOCTOR') {
+        router.push('/doctor/setup')
+        return
+      }
+
+      // Передаём токен, чтобы не зависеть от cookie
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const token = lsToken || undefined
+
       const response = await fetch('/api/doctor/profile', {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: 'include'
       })
       
