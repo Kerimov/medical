@@ -27,6 +27,13 @@ export default function DashboardPage() {
   const [adminDocs, setAdminDocs] = useState<any[]>([])
   const [adminLoading, setAdminLoading] = useState(true)
   const isAdmin = !!(user && user.role === 'ADMIN')
+  const displayFirstName = (() => {
+    const fullName = user?.name?.trim() ?? ''
+    if (!fullName) return ''
+    const parts = fullName.split(/\s+/)
+    if (parts.length >= 2) return parts[1] // Фамилия Имя (Отчество?) → берем Имя
+    return parts[0]
+  })()
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -85,7 +92,7 @@ export default function DashboardPage() {
             <Activity className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-            Добро пожаловать, {user.name.split(' ')[0]}!
+            Добро пожаловать, {displayFirstName}!
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Управляйте своим здоровьем легко и эффективно
