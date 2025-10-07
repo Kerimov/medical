@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const [adminDocs, setAdminDocs] = useState<any[]>([])
   const [adminLoading, setAdminLoading] = useState(true)
   const [todayMedicationsProgress, setTodayMedicationsProgress] = useState<string>('—')
-  const [nextAppointmentTime, setNextAppointmentTime] = useState<string>('—')
+  const [appointments, setAppointments] = useState<any[]>([])
   const [manualPulse, setManualPulse] = useState<string>('')
   const [journalCount, setJournalCount] = useState<number>(0)
   const isAdmin = !!(user && user.role === 'ADMIN')
@@ -82,14 +82,10 @@ export default function DashboardPage() {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined
         })
         if (apptRes.ok) {
-          const { appointments } = await apptRes.json()
-          const upcoming = (appointments || []).filter((a: any) => new Date(a.scheduledAt) > new Date())
+          const { appointments: apiAppointments } = await apptRes.json()
+          const upcoming = (apiAppointments || []).filter((a: any) => new Date(a.scheduledAt) > new Date())
           upcoming.sort((a: any, b: any) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))
-          if (upcoming[0]) {
-            setNextAppointmentTime(new Date(upcoming[0].scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }))
-          } else {
-            setNextAppointmentTime('—')
-          }
+          setAppointments(upcoming)
         }
 
         // 2) Дневник: используем количество анализов как суррогат записей
@@ -159,17 +155,48 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
-            <CardContent className="pt-6">
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group md:col-span-2">
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Ближайший</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">{nextAppointmentTime}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Прием</p>
+                <CardTitle className="text-lg">Расписание приемов</CardTitle>
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10">
+                  <Calendar className="h-6 w-6 text-primary" />
                 </div>
-                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
-                  <Calendar className="h-8 w-8 text-primary" />
-                </div>
+              </div>
+              <CardDescription>Все запланированные визиты</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="rounded-lg border border-blue-100/60 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Дата</TableHead>
+                      <TableHead>Время</TableHead>
+                      <TableHead>Врач</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead className="text-right">Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {appointments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">Нет запланированных приемов</TableCell>
+                      </TableRow>
+                    ) : (
+                      appointments.map((a: any) => (
+                        <TableRow key={a.id}>
+                          <TableCell>{new Date(a.scheduledAt).toLocaleDateString('ru-RU')}</TableCell>
+                          <TableCell>{new Date(a.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                          <TableCell>{a.doctorName || a.doctor?.fullName || '—'}</TableCell>
+                          <TableCell>{a.status ? String(a.status).toLowerCase() : 'запланирован'}</TableCell>
+                          <TableCell className="text-right">
+                            <Link href="/my-appointments" className="text-primary hover:underline">Открыть</Link>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>

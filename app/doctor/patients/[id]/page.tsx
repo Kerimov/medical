@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+//
 import { Users, Calendar, FileText, Stethoscope, Pill, NotebookPen } from 'lucide-react'
 
 interface PatientCardData {
@@ -25,14 +24,8 @@ export default function PatientCardPage() {
   const [data, setData] = useState<PatientCardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({
-    title: '',
-    type: '',
-    date: '',
-    laboratory: '',
-    notes: ''
-  })
-  const [resultsJson, setResultsJson] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [selectedFileName, setSelectedFileName] = useState<string>('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,7 +72,7 @@ export default function PatientCardPage() {
             </CardHeader>
             <CardContent>
               <div className="flex justify-end mb-4">
-                <Button size="sm" onClick={() => setAdding(true)}>Добавить анализ</Button>
+                <Button size="sm" onClick={() => { setAdding(true) }}>Добавить анализ</Button>
               </div>
               {analyses.length === 0 ? (
                 <div className="text-muted-foreground">Анализы не найдены</div>
@@ -198,57 +191,50 @@ export default function PatientCardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">Название</label>
-                  <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+              <div className="space-y-3">
+                <input
+                  ref={fileInputRef}
+                  id="doctor-upload-file"
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => setSelectedFileName(e.target.files && e.target.files[0] ? e.target.files[0].name : '')}
+                />
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()}>Выбрать файл</Button>
+                  <span className="text-sm text-muted-foreground">{selectedFileName || 'Файл не выбран'}</span>
                 </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Тип</label>
-                  <Input value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Дата</label>
-                  <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">Лаборатория</label>
-                  <Input value={form.laboratory} onChange={e => setForm({ ...form, laboratory: e.target.value })} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-muted-foreground">Результаты (JSON)</label>
-                  <Textarea rows={6} value={resultsJson} onChange={e => setResultsJson(e.target.value)} placeholder='[{"name":"Гемоглобин","value":130,"unit":"г/л","isNormal":true}]' />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-muted-foreground">Заметки</label>
-                  <Textarea rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
-                </div>
+                <p className="text-xs text-muted-foreground">Допустимые форматы: PDF, JPG, PNG. До 10 МБ.</p>
               </div>
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => setAdding(false)}>Отмена</Button>
                 <Button onClick={async () => {
                   try {
-                    const res = await fetch('/api/doctor/analyses', {
-                      method: 'POST',
-                      credentials: 'include',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        patientId: patient.id,
-                        title: form.title,
-                        type: form.type,
-                        date: form.date,
-                        laboratory: form.laboratory,
-                        notes: form.notes,
-                        results: resultsJson || '[]'
-                      })
-                    })
-                    if (res.ok) {
-                      const created = await res.json()
-                      setData({ ...data, analyses: [created.analysis, ...analyses] })
-                      setAdding(false)
-                      setForm({ title: '', type: '', date: '', laboratory: '', notes: '' })
-                      setResultsJson('')
+                  const fi = fileInputRef.current
+                  if (!fi || !fi.files || !fi.files[0]) {
+                    alert('Выберите файл')
+                    return
+                  }
+                  const fd = new FormData()
+                  fd.append('file', fi.files[0])
+                  fd.append('patientId', patient.id)
+                  const up = await fetch('/api/documents/upload', { method: 'POST', body: fd, credentials: 'include' })
+                  if (!up.ok) throw new Error('upload failed')
+                  const upJson = await up.json()
+                  const documentId = upJson?.document?.id
+                  setAdding(false)
+                  // Ждем распознавание: опрос /api/documents/[id] до parsed=true
+                  if (documentId) {
+                    for (let i = 0; i < 30; i++) { // до ~60 сек при шаге 2с
+                      await new Promise(r => setTimeout(r, 2000))
+                      const dres = await fetch(`/api/documents/${documentId}`, { credentials: 'include' })
+                      if (dres.ok) {
+                        const dj = await dres.json()
+                        if (dj?.document?.parsed) break
+                      }
                     }
+                  }
+                  const re = await fetch(`/api/doctor/patients/${patient.id}`, { credentials: 'include' })
+                  if (re.ok) setData(await re.json())
                   } catch {}
                 }}>Сохранить</Button>
               </div>

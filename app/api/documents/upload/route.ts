@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
     // Получаем файл
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const targetPatientId = (formData.get('patientId') as string) || ''
 
     if (!file) {
       return NextResponse.json(
@@ -79,10 +80,26 @@ export async function POST(request: NextRequest) {
       category = DocumentCategory.IMAGING
     }
 
+    // Определяем пользователя-владельца документа
+    let ownerUserId = payload.userId
+    if (targetPatientId && (payload as any).role === 'DOCTOR') {
+      // Врач может загрузить для пациента, только если пациент прикреплен или есть прием
+      const doctor = await prisma.doctorProfile.findUnique({ where: { userId: payload.userId } })
+      if (doctor) {
+        const [hasRecord, hasAppointment] = await Promise.all([
+          prisma.patientRecord.findFirst({ where: { doctorId: doctor.id, patientId: targetPatientId }, select: { id: true } }),
+          prisma.appointment.findFirst({ where: { doctorId: doctor.id, patientId: targetPatientId }, select: { id: true } })
+        ])
+        if (hasRecord || hasAppointment) {
+          ownerUserId = targetPatientId
+        }
+      }
+    }
+
     // Создаем документ
     const document = await prisma.document.create({
       data: {
-        userId: payload.userId,
+        userId: ownerUserId,
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
@@ -302,349 +319,37 @@ async function processDocumentOCR(documentId: string) {
       } catch (visionError) {
         console.error('[OCR] OpenAI Vision attempt failed:', visionError)
       }
-      // Если ни OCR.space, ни OpenAI Vision не сработали — используем mock данные как fallback
+      // Если ни OCR.space, ни OpenAI Vision не сработали — используем mock-данные как резерв
     }
     
-    // ВАРИАНТ 2: Mock данные (используются только если OCR не сработал)
-    await new Promise(resolve => setTimeout(resolve, 2000)) // Симуляция обработки
-    
-    // Генерируем случайный вариант анализа (норма или с отклонениями)
-    const variant = Math.random()
-    const hasDeviations = variant > 0.5 // 50% шанс отклонений для демонстрации
-    
-    // Расширенные mock данные - полный анализ крови с 15 показателями
+    // Мок-данные (минимальные), чтобы интерфейс продолжал работать в демонстрационном режиме
     const mockData = {
-      rawText: `РАЗВЕРНУТЫЙ АНАЛИЗ КРОВИ
-      
-Дата исследования: 15.10.2024
-Лаборатория: МедЛаб Центр, г. Москва
-Врач-лаборант: Иванов И.И.
-Пациент: ${document.fileName.replace('.pdf', '')}
-
-ОБЩИЕ ПОКАЗАТЕЛИ:
-
-Гемоглобин (HGB): 145 г/л
-Референсные значения: 120-160 г/л
-
-Эритроциты (RBC): 4.5 млн/мкл  
-Референсные значения: 4.0-5.5 млн/мкл
-
-Гематокрит (HCT): 42 %
-Референсные значения: 36-48 %
-
-Средний объем эритроцита (MCV): 88 фл
-Референсные значения: 80-100 фл
-
-Среднее содержание Hb в эритроците (MCH): 30 пг
-Референсные значения: 27-34 пг
-
-ЛЕЙКОЦИТАРНАЯ ФОРМУЛА:
-
-Лейкоциты (WBC): 6.2 тыс/мкл
-Референсные значения: 4.0-9.0 тыс/мкл
-
-Нейтрофилы (сегментоядерные): 58 %
-Референсные значения: 47-72 %
-
-Лимфоциты: 32 %
-Референсные значения: 19-37 %
-
-Моноциты: 7 %
-Референсные значения: 3-11 %
-
-Эозинофилы: 2 %
-Референсные значения: 0.5-5 %
-
-Базофилы: 1 %
-Референсные значения: 0-1 %
-
-СИСТЕМА СВЕРТЫВАНИЯ:
-
-Тромбоциты (PLT): 280 тыс/мкл
-Референсные значения: 150-400 тыс/мкл
-
-СОЭ: 8 мм/ч
-Референсные значения: 0-15 мм/ч
-
-БИОХИМИЧЕСКИЕ ПОКАЗАТЕЛИ:
-
-Глюкоза: 4.8 ммоль/л
-Референсные значения: 3.3-5.5 ммоль/л
-
-Общий белок: 72 г/л
-Референсные значения: 64-83 г/л
-
-ЗАКЛЮЧЕНИЕ:
-${hasDeviations 
-  ? 'Выявлены отклонения от нормы:\n- Анемия легкой степени (снижение гемоглобина, эритроцитов, гематокрита)\n- Лейкоцитоз с нейтрофилезом (возможен воспалительный процесс)\n- Повышение СОЭ (подтверждает воспаление)\n- Повышение глюкозы (требуется контроль, исключить диабет)\n\nРекомендуется: консультация терапевта, повторный анализ через 2 недели, консультация эндокринолога.' 
-  : 'Все показатели в пределах референсных значений. Признаков воспалительного процесса, анемии или нарушений свертывания не выявлено. Рекомендуется контрольный анализ через 6 месяцев.'}`,
-      ocrConfidence: 0.96,
-      studyType: 'Развернутый анализ крови',
-      studyDate: new Date('2024-10-15'),
-      laboratory: 'МедЛаб Центр, г. Москва',
-      doctor: 'Иванов И.И.',
-      findings: hasDeviations 
-        ? 'Выявлены отклонения от нормы: анемия легкой степени, лейкоцитоз с нейтрофилезом (возможен воспалительный процесс), повышение СОЭ, повышение глюкозы. Рекомендуется консультация терапевта, повторный анализ через 2 недели, консультация эндокринолога.'
-        : 'Все показатели в пределах референсных значений. Признаков воспалительного процесса, анемии или нарушений свертывания не выявлено. Рекомендуется контрольный анализ через 6 месяцев.',
+      rawText: 'DEMO MOCK: Анализ не распознан OCR, использованы демонстрационные данные.',
+      ocrConfidence: 0.5,
+      studyType: 'Общий анализ крови',
+      studyDate: new Date(),
+      laboratory: 'Demo-Lab',
+      doctor: 'Demo Doctor',
+      findings: 'Демонстрационные данные. Для реального распознавания настройте OCR ключ.',
       parsed: true,
-      indicators: hasDeviations ? [
-        // С отклонениями - демонстрация системы определения
-        {
-          name: 'Гемоглобин (HGB)',
-          value: 105, // ПОНИЖЕН
-          unit: 'г/л',
-          referenceMin: 120,
-          referenceMax: 160,
-          isNormal: false
-        },
-        {
-          name: 'Эритроциты (RBC)',
-          value: 3.5, // ПОНИЖЕНЫ
-          unit: 'млн/мкл',
-          referenceMin: 4.0,
-          referenceMax: 5.5,
-          isNormal: false
-        },
-        {
-          name: 'Гематокрит (HCT)',
-          value: 33, // ПОНИЖЕН
-          unit: '%',
-          referenceMin: 36,
-          referenceMax: 48,
-          isNormal: false
-        },
-        {
-          name: 'Средний объем эритроцита (MCV)',
-          value: 88,
-          unit: 'фл',
-          referenceMin: 80,
-          referenceMax: 100,
-          isNormal: true
-        },
-        {
-          name: 'Среднее содержание Hb (MCH)',
-          value: 30,
-          unit: 'пг',
-          referenceMin: 27,
-          referenceMax: 34,
-          isNormal: true
-        },
-        {
-          name: 'Лейкоциты (WBC)',
-          value: 11.5, // ПОВЫШЕНЫ
-          unit: 'тыс/мкл',
-          referenceMin: 4.0,
-          referenceMax: 9.0,
-          isNormal: false
-        },
-        {
-          name: 'Нейтрофилы (сегментоядерные)',
-          value: 78, // ПОВЫШЕНЫ
-          unit: '%',
-          referenceMin: 47,
-          referenceMax: 72,
-          isNormal: false
-        },
-        {
-          name: 'Лимфоциты',
-          value: 15, // ПОНИЖЕНЫ
-          unit: '%',
-          referenceMin: 19,
-          referenceMax: 37,
-          isNormal: false
-        },
-        {
-          name: 'Моноциты',
-          value: 7,
-          unit: '%',
-          referenceMin: 3,
-          referenceMax: 11,
-          isNormal: true
-        },
-        {
-          name: 'Эозинофилы',
-          value: 2,
-          unit: '%',
-          referenceMin: 0.5,
-          referenceMax: 5,
-          isNormal: true
-        },
-        {
-          name: 'Базофилы',
-          value: 1,
-          unit: '%',
-          referenceMin: 0,
-          referenceMax: 1,
-          isNormal: true
-        },
-        {
-          name: 'Тромбоциты (PLT)',
-          value: 280,
-          unit: 'тыс/мкл',
-          referenceMin: 150,
-          referenceMax: 400,
-          isNormal: true
-        },
-        {
-          name: 'СОЭ',
-          value: 22, // ПОВЫШЕНА
-          unit: 'мм/ч',
-          referenceMin: 0,
-          referenceMax: 15,
-          isNormal: false
-        },
-        {
-          name: 'Глюкоза',
-          value: 6.2, // ПОВЫШЕНА
-          unit: 'ммоль/л',
-          referenceMin: 3.3,
-          referenceMax: 5.5,
-          isNormal: false
-        },
-        {
-          name: 'Общий белок',
-          value: 72,
-          unit: 'г/л',
-          referenceMin: 64,
-          referenceMax: 83,
-          isNormal: true
-        }
-      ] : [
-        // Все показатели в норме
-        {
-          name: 'Гемоглобин (HGB)',
-          value: 145,
-          unit: 'г/л',
-          referenceMin: 120,
-          referenceMax: 160,
-          isNormal: true
-        },
-        {
-          name: 'Эритроциты (RBC)',
-          value: 4.5,
-          unit: 'млн/мкл',
-          referenceMin: 4.0,
-          referenceMax: 5.5,
-          isNormal: true
-        },
-        {
-          name: 'Гематокрит (HCT)',
-          value: 42,
-          unit: '%',
-          referenceMin: 36,
-          referenceMax: 48,
-          isNormal: true
-        },
-        {
-          name: 'Средний объем эритроцита (MCV)',
-          value: 88,
-          unit: 'фл',
-          referenceMin: 80,
-          referenceMax: 100,
-          isNormal: true
-        },
-        {
-          name: 'Среднее содержание Hb (MCH)',
-          value: 30,
-          unit: 'пг',
-          referenceMin: 27,
-          referenceMax: 34,
-          isNormal: true
-        },
-        {
-          name: 'Лейкоциты (WBC)',
-          value: 6.2,
-          unit: 'тыс/мкл',
-          referenceMin: 4.0,
-          referenceMax: 9.0,
-          isNormal: true
-        },
-        {
-          name: 'Нейтрофилы (сегментоядерные)',
-          value: 58,
-          unit: '%',
-          referenceMin: 47,
-          referenceMax: 72,
-          isNormal: true
-        },
-        {
-          name: 'Лимфоциты',
-          value: 32,
-          unit: '%',
-          referenceMin: 19,
-          referenceMax: 37,
-          isNormal: true
-        },
-        {
-          name: 'Моноциты',
-          value: 7,
-          unit: '%',
-          referenceMin: 3,
-          referenceMax: 11,
-          isNormal: true
-        },
-        {
-          name: 'Эозинофилы',
-          value: 2,
-          unit: '%',
-          referenceMin: 0.5,
-          referenceMax: 5,
-          isNormal: true
-        },
-        {
-          name: 'Базофилы',
-          value: 1,
-          unit: '%',
-          referenceMin: 0,
-          referenceMax: 1,
-          isNormal: true
-        },
-        {
-          name: 'Тромбоциты (PLT)',
-          value: 280,
-          unit: 'тыс/мкл',
-          referenceMin: 150,
-          referenceMax: 400,
-          isNormal: true
-        },
-        {
-          name: 'СОЭ',
-          value: 8,
-          unit: 'мм/ч',
-          referenceMin: 0,
-          referenceMax: 15,
-          isNormal: true
-        },
-        {
-          name: 'Глюкоза',
-          value: 4.8,
-          unit: 'ммоль/л',
-          referenceMin: 3.3,
-          referenceMax: 5.5,
-          isNormal: true
-        },
-        {
-          name: 'Общий белок',
-          value: 72,
-          unit: 'г/л',
-          referenceMin: 64,
-          referenceMax: 83,
-          isNormal: true
-        }
+      indicators: [
+        { name: 'Гемоглобин (HGB)', value: 140, unit: 'г/л', referenceMin: 120, referenceMax: 160, isNormal: true },
+        { name: 'Лейкоциты (WBC)', value: 6.0, unit: 'тыс/мкл', referenceMin: 4.0, referenceMax: 9.0, isNormal: true }
       ]
     }
 
     try {
       await prisma.document.update({ where: { id: documentId }, data: mockData })
       await saveAnalysisFromDocument(documentId)
+      console.warn(`[OCR] Real OCR failed; mock data saved for document ${documentId}`)
+      return
     } catch (e: any) {
       if (e?.code === 'P2025') {
-        console.warn(`[OCR] Document ${documentId} was removed before update (mock). Skipping.`)
+        console.warn(`[OCR] Document ${documentId} was removed before mock update. Skipping.`)
         return
       }
       throw e
     }
-    console.log(`[OCR] Processing completed for document ${documentId}`)
     
     /* Для продакшена - интеграция с Google Cloud Vision:
     
