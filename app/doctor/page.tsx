@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { 
   Users, 
   FileText, 
@@ -38,6 +39,7 @@ export default function DoctorDashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<DoctorStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [doctorAppointments, setDoctorAppointments] = useState<any[]>([])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -80,13 +82,25 @@ export default function DoctorDashboard() {
 
   const fetchDoctorStats = async () => {
     try {
-      const response = await fetch('/api/doctor/stats', {
-        credentials: 'include'
-      })
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+      const response = await fetch('/api/doctor/stats', { headers, credentials: 'include' })
       
       if (response.ok) {
         const data = await response.json()
         setStats(data)
+      }
+      // Параллельно подтягиваем все будущие приемы врача из отдельного эндпоинта
+      try {
+        const apptsRes = await fetch('/api/doctor/appointments', { headers, credentials: 'include' })
+        if (apptsRes.ok) {
+          const { appointments } = await apptsRes.json()
+          const all = Array.isArray(appointments) ? appointments.slice() : []
+          all.sort((a: any, b: any) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))
+          setDoctorAppointments(all)
+        }
+      } catch (e) {
+        console.warn('Failed to load doctor appointments', e)
       }
     } catch (error) {
       console.error('Error fetching doctor stats:', error)
@@ -252,47 +266,54 @@ export default function DoctorDashboard() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Appointments */}
+          {/* Appointments Table */}
           <Card className="glass-effect border-0 shadow-medical">
             <CardHeader>
               <CardTitle className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                Ближайшие приемы
+                Расписание приемов
               </CardTitle>
-              <CardDescription>
-                Запланированные встречи с пациентами
-              </CardDescription>
+              <CardDescription>Все визиты пациентов</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats?.upcomingAppointments?.length ? (
-                <div className="space-y-4">
-                  {stats.upcomingAppointments.map((appointment: any) => (
-                    <div key={appointment.id} className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center text-white">
-                          <Clock className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{appointment.patientName}</p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(appointment.scheduledAt).toLocaleString('ru-RU')}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant={appointment.status === 'confirmed' ? 'default' : 'secondary'}>
-                        {appointment.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Нет запланированных приемов</p>
-                </div>
-              )}
-              <div className="mt-4">
+              <div className="rounded-lg border border-green-100 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Дата</TableHead>
+                      <TableHead>Время</TableHead>
+                      <TableHead>Пациент</TableHead>
+                      <TableHead>Тип</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead className="text-right">Действия</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {doctorAppointments.length ? (
+                      doctorAppointments.map((a: any) => (
+                        <TableRow key={a.id}>
+                          <TableCell>{new Date(a.scheduledAt).toLocaleDateString('ru-RU')}</TableCell>
+                          <TableCell>{new Date(a.scheduledAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                          <TableCell>{a.patientName || '—'}</TableCell>
+                          <TableCell>{a.appointmentType || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant={a.status === 'confirmed' ? 'default' : 'secondary'}>{a.status || 'запланирован'}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link href={`/doctor/patients/${a.patientId}`} className="text-primary hover:underline">Карточка</Link>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">Нет запланированных приемов</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="mt-4 flex justify-end">
                 <Link href="/doctor/appointments">
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline">
                     <Calendar className="w-4 h-4 mr-2" />
                     Все приемы
                   </Button>

@@ -14,8 +14,23 @@ import {
   Zap
 } from 'lucide-react'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/auth'
 
 export default function Home() {
+  // Редирект врачей на их дашборд
+  try {
+    const token = cookies().get('token')?.value
+    if (token) {
+      const payload = verifyToken(token)
+      if (payload && (payload as any).role === 'DOCTOR') {
+        if (typeof window !== 'undefined') {
+          // client-side fallback
+          window.location.replace('/doctor')
+        }
+      }
+    }
+  } catch {}
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1">
