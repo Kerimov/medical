@@ -104,6 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     Cookies.set('token', data.token, { sameSite: 'lax' })
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', data.token)
+      // Немедленный редирект врачей на их дашборд
+      if (data.user?.role === 'DOCTOR') {
+        try { window.location.replace('/doctor') } catch {}
+      } else {
+        try { window.location.replace('/dashboard') } catch {}
+      }
     }
   }
 
