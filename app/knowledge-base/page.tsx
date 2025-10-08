@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Search, ChevronDown, ChevronRight, Info, ExternalLink, Calendar } from 'lucide-react';
+import { BookOpen, Search, ChevronDown, ChevronRight, Info } from 'lucide-react';
 
 interface StudyType {
   id: string;
@@ -18,8 +18,6 @@ interface StudyType {
   clinicalSignificance?: string;
   preparation?: string;
   biomaterial?: string;
-  sources?: any;
-  lastUpdated?: string;
   indicators: Indicator[];
 }
 
@@ -33,8 +31,6 @@ interface Indicator {
   clinicalSignificance?: string;
   increasedMeaning?: string;
   decreasedMeaning?: string;
-  sources?: any;
-  lastUpdated?: string;
   referenceRanges: ReferenceRange[];
 }
 
@@ -157,58 +153,6 @@ export default function KnowledgeBasePage() {
     return `${min}-${max} лет`;
   };
 
-  const renderSources = (sources: any) => {
-    if (!sources) return null;
-    
-    return (
-      <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-center gap-2 mb-2">
-          <ExternalLink className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-800">Источники данных</span>
-        </div>
-        
-        {sources.primary && (
-          <div className="mb-2">
-            <span className="text-xs text-gray-600">Основной источник:</span>
-            <a 
-              href={sources.primary.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="ml-1 text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              {sources.primary.name}
-            </a>
-          </div>
-        )}
-        
-        {sources.references && sources.references.length > 0 && (
-          <div>
-            <span className="text-xs text-gray-600">Дополнительные источники:</span>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {sources.references.map((ref: any, index: number) => (
-                <a 
-                  key={index}
-                  href={ref.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                >
-                  {ref.name}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {sources.lastChecked && (
-          <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-            <Calendar className="h-3 w-3" />
-            <span>Обновлено: {new Date(sources.lastChecked).toLocaleDateString('ru-RU')}</span>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -316,8 +260,6 @@ export default function KnowledgeBasePage() {
                   )}
                   <span className="text-xs text-gray-600">• Показателей: {studyType.indicators.length}</span>
                 </div>
-                
-                {studyType.sources && renderSources(studyType.sources)}
                     </div>
                   </div>
                 </CardHeader>
@@ -400,9 +342,6 @@ export default function KnowledgeBasePage() {
                                     <p className="text-sm text-gray-600 mt-1">{indicator.decreasedMeaning}</p>
                                   </div>
                                 )}
-
-                                {/* Источники данных */}
-                                {indicator.sources && renderSources(indicator.sources)}
 
                                 {/* Нормативные диапазоны */}
                                 {indicator.referenceRanges.length > 0 && (

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { BookOpen, Stethoscope, FileText, BarChart3, Plus, Edit, Trash2, Search, RefreshCw } from 'lucide-react';
+import { BookOpen, Stethoscope, FileText, BarChart3, Plus, Edit, Trash2, Search } from 'lucide-react';
 
 interface StudyType {
   id: string;
@@ -251,15 +251,6 @@ export default function KnowledgeBasePage() {
               База знаний
             </h1>
             <p className="text-gray-600 mt-2">Управление медицинскими справочниками и нормативами</p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => router.push('/admin/knowledge/sync')}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:opacity-90"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Синхронизация
-            </Button>
           </div>
         </div>
 
