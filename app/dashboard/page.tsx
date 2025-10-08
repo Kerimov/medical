@@ -340,6 +340,7 @@ export default function DashboardPage() {
           </Link>
 
           <Link href="/diary" className="block group">
+          <Link href="/analytics" className="block group">
           <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between mb-4">
@@ -380,6 +381,7 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+          </Link>
 
           <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
             <CardHeader className="pb-4">
