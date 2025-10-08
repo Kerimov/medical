@@ -231,7 +231,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 group">
+          <Link href="/diary" className="block group">
+          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -245,6 +246,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+          </Link>
         </div>
 
         {/* Main Features */}
@@ -337,6 +339,7 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
+          <Link href="/diary" className="block group">
           <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between mb-4">
@@ -356,6 +359,7 @@ export default function DashboardPage() {
               </Button>
             </CardContent>
           </Card>
+          </Link>
 
           <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
             <CardHeader className="pb-4">

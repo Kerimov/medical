@@ -27,6 +27,8 @@ model User {
   recommendations Recommendation[]
   doctorProfile DoctorProfile?
   patientRecords PatientRecord[]
+  healthDiaryEntries HealthDiaryEntry[]
+  diaryTags         DiaryTag[]
 }
 
 model DoctorProfile {
@@ -420,4 +422,58 @@ model ReferenceRange {
   updatedAt     DateTime     @updatedAt
   
   @@unique([indicatorId, methodologyId, gender, ageGroupMin, ageGroupMax])
+}
+
+/// Дневник здоровья
+model HealthDiaryEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entryDate   DateTime // Дата/время записи
+
+  // Показатели самочувствия
+  mood        Int?     // 1-5
+  painScore   Int?     // 0-10
+  sleepHours  Float?
+  steps       Int?
+  temperature Float?
+  weight      Float?
+  systolic    Int?
+  diastolic   Int?
+  pulse       Int?
+
+  symptoms    String?  // свободный текст
+  notes       String?
+
+  tags        DiaryTagOnEntry[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, entryDate])
+}
+
+model DiaryTag {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String?  // hex
+
+  entries   DiaryTagOnEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model DiaryTagOnEntry {
+  entryId String
+  tagId   String
+
+  entry   HealthDiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tag     DiaryTag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, tagId])
 }
