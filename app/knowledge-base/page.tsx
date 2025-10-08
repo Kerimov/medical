@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Search, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { BookOpen, Search, ChevronDown, ChevronRight, Info, Heart, TrendingUp } from 'lucide-react';
 
 interface StudyType {
   id: string;
@@ -31,6 +31,8 @@ interface Indicator {
   clinicalSignificance?: string;
   increasedMeaning?: string;
   decreasedMeaning?: string;
+  maintenanceRecommendations?: string;
+  improvementRecommendations?: string;
   referenceRanges: ReferenceRange[];
 }
 
@@ -340,6 +342,35 @@ export default function KnowledgeBasePage() {
                                   <div>
                                     <p className="text-sm font-medium text-gray-700">Понижение показателя:</p>
                                     <p className="text-sm text-gray-600 mt-1">{indicator.decreasedMeaning}</p>
+                                  </div>
+                                )}
+
+                                {/* Рекомендации */}
+                                {(indicator.maintenanceRecommendations || indicator.improvementRecommendations) && (
+                                  <div className="space-y-3">
+                                    {indicator.maintenanceRecommendations && (
+                                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Heart className="h-5 w-5 text-green-600" />
+                                          <h4 className="font-semibold text-green-800">Рекомендации для поддержания нормы</h4>
+                                        </div>
+                                        <div className="text-sm text-gray-700 whitespace-pre-line">
+                                          {indicator.maintenanceRecommendations}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {indicator.improvementRecommendations && (
+                                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <TrendingUp className="h-5 w-5 text-blue-600" />
+                                          <h4 className="font-semibold text-blue-800">Рекомендации для улучшения показателей</h4>
+                                        </div>
+                                        <div className="text-sm text-gray-700 whitespace-pre-line">
+                                          {indicator.improvementRecommendations}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
 

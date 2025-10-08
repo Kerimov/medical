@@ -372,6 +372,8 @@ model Indicator {
   synonyms             Json?           // Синонимы и альтернативные названия
   sources              Json?           // Ссылки на источники (UpToDate, MSD, Medscape, PubMed и др.)
   lastUpdated          DateTime?       // Дата последнего обновления из источников
+  maintenanceRecommendations String?   // Рекомендации для поддержания в норме
+  improvementRecommendations String?   // Рекомендации для улучшения показателей
   isActive             Boolean         @default(true)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt

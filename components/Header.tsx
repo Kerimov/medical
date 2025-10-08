@@ -73,11 +73,9 @@ export function Header() {
               )}
             </>
           )}
-          <Button variant="outline" className="ml-2" onClick={() => router.back()}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Назад
-          </Button>
+          {/* Кнопка "Назад" убрана из шапки; показывается в разделах */}
           {/* Ссылка "Врач" скрыта: достаточно кнопки "Личный кабинет" */}
-          {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+          {user && user.role === 'ADMIN' && (
             <Link href="/admin" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
               <Shield className="h-4 w-4" />
               Админ
@@ -178,7 +176,7 @@ export function Header() {
                   <Bell className="h-4 w-4" />
                   Напоминания
                 </Link>
-                {user && (process.env.NEXT_PUBLIC_ADMIN_EMAILS || 'test@pma.ru,admin@example.com').split(',').map(e => e.trim().toLowerCase()).includes(user.email.toLowerCase()) && (
+                {user && user.role === 'ADMIN' && (
                   <Link 
                     href="/admin" 
                     className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2"
@@ -195,9 +193,7 @@ export function Header() {
               {!isLoading && (
                 user ? (
                   <>
-                    <Button variant="outline" className="w-full" onClick={() => { router.back(); setMobileMenuOpen(false) }}>
-                      <ArrowLeft className="w-4 h-4 mr-2" /> Назад
-                    </Button>
+                    {/* Кнопка "Назад" убрана из мобильного меню; показывается в разделах */}
                     <Link href={isDoctor ? "/doctor" : "/dashboard"} onClick={() => setMobileMenuOpen(false)}>
                       <Button className="w-full gradient-primary text-white">
                         <User className="mr-2 h-4 w-4" />
