@@ -148,6 +148,56 @@ export async function analyzeUserHealth(userId: string) {
     }
   }
 
+  // Анализируем показатели из таблицы Analysis (если есть структурированные results)
+  for (const analysis of recentAnalyses) {
+    try {
+      const parsed = typeof analysis.results === 'string' ? JSON.parse(analysis.results as unknown as string) : analysis.results
+      if (!parsed) continue
+
+      const pushFromIndicator = (nameRaw: any, v: any) => {
+        const name = (nameRaw || '').toString().toLowerCase()
+        const isNormal = v?.isNormal ?? v?.normal ?? v?.Normal ?? true
+        const indicator = {
+          name: nameRaw?.toString?.() ?? String(nameRaw),
+          value: Number(v?.value ?? v?.Value),
+          unit: v?.unit ?? v?.Unit,
+          referenceMin: v?.referenceMin ?? v?.min ?? v?.ReferenceMin ?? NaN,
+          referenceMax: v?.referenceMax ?? v?.max ?? v?.ReferenceMax ?? NaN,
+          isNormal: Boolean(isNormal)
+        }
+        if (indicator.isNormal === false) {
+          abnormalIndicators.push({ ...indicator, analysisId: analysis.id, analysisDate: analysis.date })
+
+          if (name.includes('витамин d') || name.includes('25-oh')) {
+            healthIssues.push('vitamin_d_deficiency')
+          } else if (name.includes('холестерин') || name.includes('cholesterol')) {
+            healthIssues.push('high_cholesterol')
+          } else if (name.includes('глюкоз') || name.includes('glucose')) {
+            healthIssues.push('high_glucose')
+          } else if (name.includes('гемоглобин') || name.includes('hemoglobin')) {
+            healthIssues.push('low_hemoglobin')
+          } else if (name.includes('железо') || name.includes('ferritin')) {
+            healthIssues.push('iron_deficiency')
+          }
+        }
+      }
+
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          const name = item?.name ?? item?.Name
+          if (name !== undefined) pushFromIndicator(name, item)
+        }
+      } else if (typeof parsed === 'object') {
+        const entries = Object.entries(parsed as Record<string, any>)
+        for (const [nameRaw, v] of entries) {
+          pushFromIndicator(nameRaw, v)
+        }
+      }
+    } catch {
+      // игнорируем неструктурированные results
+    }
+  }
+
   return {
     healthIssues: [...new Set(healthIssues)], // Убираем дубликаты
     abnormalIndicators,
@@ -168,7 +218,7 @@ export async function createEnhancedRecommendationsForUser(
 
     // Анализируем здоровье пользователя
     const healthData = await analyzeUserHealth(userId)
-    const { healthIssues, abnormalIndicators } = healthData
+    const { healthIssues, abnormalIndicators, recentAnalyses } = healthData
 
     // Получаем информацию о пользователе
     const user = await prisma.user.findUnique({
@@ -202,7 +252,8 @@ export async function createEnhancedRecommendationsForUser(
             metadata: {
               testType: 'vitamin_d',
               currentValue: vitDIndicator?.value,
-              distance: (lab as any).distance
+              distance: (lab as any).distance,
+              aiExplanation: 'Обнаружен дефицит витамина D по результатам анализа. Рекомендуем контрольное исследование для подтверждения динамики и подбора коррекции.'
             }
           })
         }
@@ -228,14 +279,15 @@ export async function createEnhancedRecommendationsForUser(
               supplementType: 'vitamin_d3',
               recommendedDosage: '2000-4000 МЕ',
               duration: '2-3 месяца',
-              distance: (store as any).distance
+              distance: (store as any).distance,
+              aiExplanation: 'Добавки витамина D3 помогают безопасно и предсказуемо повысить уровень 25‑OH D до целевых значений.'
             }
           })
         }
       }
 
       // Рекомендация статьи
-      recommendations.push({
+        recommendations.push({
         userId,
         type: 'ARTICLE',
         title: 'Витамин D: важность и способы коррекции дефицита',
@@ -244,7 +296,8 @@ export async function createEnhancedRecommendationsForUser(
         priority: 3,
         metadata: {
           articleUrl: 'https://example.com/vitamin-d-deficiency',
-          readingTime: '10 минут'
+            readingTime: '10 минут',
+            aiExplanation: 'Рекомендуем ознакомиться с материалом, который поможет понять причины дефицита и принципы его коррекции.'
         }
       })
     }
@@ -270,7 +323,8 @@ export async function createEnhancedRecommendationsForUser(
           metadata: {
             serviceType: 'nutrition_consultation',
             currentValue: cholIndicator?.value,
-            distance: (nutritionists[0] as any).distance
+            distance: (nutritionists[0] as any).distance,
+            aiExplanation: 'Коррекция питания (снижение насыщенных жиров, увеличение клетчатки и омега‑3) — первый шаг при гиперхолестеринемии.'
           }
         })
       }
@@ -291,7 +345,8 @@ export async function createEnhancedRecommendationsForUser(
             activityType: 'cardio',
             frequency: '3-4 раза в неделю',
             duration: '30-45 минут',
-            distance: (fitnessСenters[0] as any).distance
+            distance: (fitnessСenters[0] as any).distance,
+            aiExplanation: 'Аэробные нагрузки улучшают липидный профиль и снижают сердечно‑сосудистые риски.'
           }
         })
       }
@@ -318,7 +373,8 @@ export async function createEnhancedRecommendationsForUser(
           metadata: {
             specialization: 'endocrinology',
             currentValue: glucoseIndicator?.value,
-            distance: (clinics[0] as any).distance
+            distance: (clinics[0] as any).distance,
+            aiExplanation: 'Повышенная глюкоза требует очной оценки факторов риска и возможной дообследования.'
           }
         })
       }
@@ -337,7 +393,8 @@ export async function createEnhancedRecommendationsForUser(
           companyId: laboratories[0].id,
           metadata: {
             testType: 'hba1c',
-            distance: (laboratories[0] as any).distance
+            distance: (laboratories[0] as any).distance,
+            aiExplanation: 'HbA1c отражает среднюю гликемию за 2–3 месяца и помогает подтвердить нарушение углеводного обмена.'
           }
         })
       }
@@ -365,7 +422,8 @@ export async function createEnhancedRecommendationsForUser(
           metadata: {
             supplementType: 'iron',
             currentValue: hbIndicator?.value,
-            distance: (pharmacies[0] as any).distance
+            distance: (pharmacies[0] as any).distance,
+            aiExplanation: 'Пероральные препараты железа — стандарт первой линии при железодефицитной анемии.'
           }
         })
       }
@@ -384,9 +442,49 @@ export async function createEnhancedRecommendationsForUser(
           companyId: clinics[0].id,
           metadata: {
             specialization: 'therapy',
-            distance: (clinics[0] as any).distance
+            distance: (clinics[0] as any).distance,
+            aiExplanation: 'Врач оценит возможные причины анемии (дефицит железа, кровопотери и т.д.) и подберёт тактику.'
           }
         })
+      }
+    }
+
+    // Fallback: если есть анализы со статусом abnormal, но не удалось разобрать показатели — создаем базовые рекомендации
+    if (recommendations.length === 0) {
+      const abnormalAnalyses = (recentAnalyses || []).filter(a => (a as any)?.status === 'abnormal')
+      if (abnormalAnalyses.length > 0) {
+        const [labs, clinics] = await Promise.all([
+          findNearbyCompanies('LABORATORY', userLocation, 2),
+          findNearbyCompanies('CLINIC', userLocation, 1)
+        ])
+
+        for (const a of abnormalAnalyses.slice(0, 2)) {
+          if (labs.length > 0) {
+            recommendations.push({
+              userId,
+              type: 'ANALYSIS',
+              title: `Контрольный анализ: ${a.title || a.type}`,
+              description: 'Рекомендуем пересдать анализ для подтверждения отклонений и мониторинга динамики.',
+              reason: 'Обнаружены отклонения в результатах анализа',
+              priority: 4,
+              companyId: labs[0].id,
+            metadata: { analysisId: (a as any).id, distance: (labs[0] as any).distance, aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль в ближайшей лаборатории.' }
+            })
+          }
+
+          if (clinics.length > 0) {
+            recommendations.push({
+              userId,
+              type: 'SERVICE',
+              title: 'Консультация врача по результатам анализа',
+              description: 'Запишитесь к врачу для интерпретации отклонений и подбора тактики коррекции.',
+              reason: 'Обнаружены отклонения в анализе',
+              priority: 3,
+              companyId: clinics[0].id,
+              metadata: { analysisId: (a as any).id, distance: (clinics[0] as any).distance, aiExplanation: 'Очная консультация нужна для выбора дальнейших шагов и исключения серьёзной патологии.' }
+            })
+          }
+        }
       }
     }
 
@@ -394,6 +492,20 @@ export async function createEnhancedRecommendationsForUser(
     const createdRecommendations = []
     for (const rec of recommendations) {
       try {
+        // Idempotency: skip if a similar recommendation already exists
+        const existing = await prisma.recommendation.findFirst({
+          where: {
+            userId,
+            type: rec.type,
+            title: rec.title,
+            companyId: rec.companyId || undefined,
+            status: { in: ['ACTIVE', 'VIEWED', 'CLICKED'] }
+          }
+        })
+        if (existing) {
+          continue
+        }
+
         const created = await prisma.recommendation.create({
           data: rec,
           include: {

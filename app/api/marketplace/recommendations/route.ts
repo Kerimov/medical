@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { createEnhancedRecommendationsForUser } from '@/lib/ai-recommendations-enhanced'
 
 // GET /api/marketplace/recommendations - получить персонализированные рекомендации
 export async function GET(request: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       where.type = type
     }
 
-    const recommendations = await prisma.recommendation.findMany({
+    let recommendations = await prisma.recommendation.findMany({
       where,
       include: {
         company: true,
@@ -58,6 +59,31 @@ export async function GET(request: NextRequest) {
       ],
       take: limit
     })
+
+    // Если рекомендаций ещё нет, выполняем одноразовую материализацию
+    if (recommendations.length === 0) {
+      try {
+        await createEnhancedRecommendationsForUser(decoded.userId)
+        recommendations = await prisma.recommendation.findMany({
+          where,
+          include: {
+            company: true,
+            product: true,
+            analysis: {
+              select: { id: true, title: true, type: true, date: true }
+            },
+            _count: { select: { interactions: true } }
+          },
+          orderBy: [
+            { priority: 'desc' },
+            { createdAt: 'desc' }
+          ],
+          take: limit
+        })
+      } catch (e) {
+        logger.error('Auto-materialization failed:', e)
+      }
+    }
 
     return NextResponse.json({
       recommendations,

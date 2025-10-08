@@ -323,6 +323,13 @@ export default function MarketplacePage() {
                         <strong>Причина рекомендации:</strong> {recommendation.reason}
                       </p>
                     </div>
+                    {recommendation.metadata?.aiExplanation && (
+                      <div className="mt-3 bg-white/70 p-4 rounded-xl border border-gray-200">
+                        <p className="text-sm text-gray-700 whitespace-pre-line">
+                          {recommendation.metadata.aiExplanation}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {recommendation.company && (
