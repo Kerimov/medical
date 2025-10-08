@@ -24,7 +24,10 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  const last7 = useMemo(() => (data?.trend || []).slice(-7), [data])
+  const last7 = useMemo(() => {
+    const sorted = (data?.trend || []).slice().sort((a: any, b: any) => a.day.localeCompare(b.day))
+    return sorted.slice(-7)
+  }, [data])
 
   if (!user) return null
 

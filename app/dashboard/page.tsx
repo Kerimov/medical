@@ -339,48 +339,50 @@ export default function DashboardPage() {
             </Card>
           </Link>
 
-          <Link href="/diary" className="block group">
+          {/* Аналитика (первая карточка) */}
           <Link href="/analytics" className="block group">
-          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
-                  <Heart className="h-8 w-8 text-primary" />
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="w-2 h-2 bg-medical-green rounded-full"></div>
                 </div>
-                <div className="w-2 h-2 bg-medical-red rounded-full"></div>
-              </div>
-              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Дневник здоровья</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                Отслеживайте симптомы и самочувствие
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
-                Записать
-              </Button>
-            </CardContent>
-          </Card>
+                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Аналитика</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Просматривайте статистику и графики
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                  Анализ
+                </Button>
+              </CardContent>
+            </Card>
           </Link>
 
-          <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
-                  <TrendingUp className="h-8 w-8 text-primary" />
+          {/* Дневник здоровья (вторая карточка) */}
+          <Link href="/diary" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <Heart className="h-8 w-8 text-primary" />
+                  </div>
+                  <div className="w-2 h-2 bg-medical-red rounded-full"></div>
                 </div>
-                <div className="w-2 h-2 bg-medical-green rounded-full"></div>
-              </div>
-              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Аналитика</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                Просматривайте статистику и графики
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
-                Анализ
-              </Button>
-            </CardContent>
-          </Card>
+                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Дневник здоровья</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Отслеживайте симптомы и самочувствие
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
+                  Записать
+                </Button>
+              </CardContent>
+            </Card>
           </Link>
 
           <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer group hover:scale-105">

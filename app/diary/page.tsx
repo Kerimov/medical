@@ -33,6 +33,7 @@ export default function DiaryPage() {
   const [form, setForm] = useState<any>({ entryDate: new Date().toISOString().slice(0,16), mood: 3, painScore: 0, sleepHours: 8 })
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [order, setOrder] = useState<'desc'|'asc'>('desc')
   const [tag, setTag] = useState('')
 
   const uniqueTags = useMemo(() => Array.from(new Set(entries.flatMap(e => e.tags.map(t => t.tag.name)))), [entries])
@@ -46,7 +47,8 @@ export default function DiaryPage() {
     if (tag) params.set('tag', tag)
     const res = await fetch(`/api/diary/entries?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } })
     const data = await res.json()
-    setEntries(data)
+    // Сортируем по дате (новые сверху)
+    setEntries((data as Entry[]).slice().sort((a: Entry, b: Entry) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()))
     setLoading(false)
   }
 
@@ -59,6 +61,16 @@ export default function DiaryPage() {
     if (res.ok) {
       setForm({ entryDate: new Date().toISOString().slice(0,16), mood: 3, painScore: 0, sleepHours: 8 })
       fetchEntries()
+    }
+  }
+
+  async function deleteEntry(id: string) {
+    if (!token) return
+    const ok = window.confirm('Удалить запись?')
+    if (!ok) return
+    const res = await fetch(`/api/diary/entries/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) {
+      setEntries(prev => prev.filter(e => e.id !== id))
     }
   }
 
@@ -138,7 +150,7 @@ export default function DiaryPage() {
           <CardTitle>Записи</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
             <div>
               <Label>С</Label>
               <Input type="date" value={from} onChange={e => setFrom(e.target.value)} />
@@ -154,14 +166,24 @@ export default function DiaryPage() {
                 {uniqueTags.map(t => (<option key={t} value={t} />))}
               </datalist>
             </div>
+            <div>
+              <Label>Сортировка</Label>
+              <select className="w-full border rounded h-9 px-2" value={order} onChange={e => setOrder(e.target.value as any)}>
+                <option value="desc">Новые сверху</option>
+                <option value="asc">Старые сверху</option>
+              </select>
+            </div>
             <div className="flex items-end">
               <Button variant="outline" onClick={fetchEntries}>Фильтровать</Button>
             </div>
           </div>
 
           <div className="space-y-3">
-            {entries.map(e => (
-              <div key={e.id} className="p-3 border rounded-lg flex flex-wrap items-center justify-between">
+            {entries
+              .slice()
+              .sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime())
+              .map(e => (
+              <div key={e.id} className="p-3 border rounded-lg flex flex-wrap items-center justify-between gap-2">
                 <div className="font-medium">{new Date(e.entryDate).toLocaleString()}</div>
                 <div className="text-sm text-gray-600 flex gap-4">
                   {e.mood != null && <span>Настроение: {e.mood}</span>}
@@ -181,6 +203,9 @@ export default function DiaryPage() {
                     ))}
                   </div>
                 )}
+                <div className="ml-auto">
+                  <Button variant="outline" onClick={() => deleteEntry(e.id)}>Удалить</Button>
+                </div>
               </div>
             ))}
             {!loading && entries.length === 0 && (

@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const tag = searchParams.get('tag')
+  const order = (searchParams.get('order') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'
 
   const where: any = { userId: user.userId }
   if (from || to) where.entryDate = {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   const entries = await prisma.healthDiaryEntry.findMany({
     where,
     include: { tags: { include: { tag: true } } },
-    orderBy: { entryDate: 'desc' }
+    orderBy: { entryDate: order }
   })
   return NextResponse.json(entries)
 }
