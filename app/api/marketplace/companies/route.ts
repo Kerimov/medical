@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
-// GET /api/marketplace/companies - получить каталог компаний
+// GET /api/marketplace/companies - получить список компаний
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const city = searchParams.get('city')
+    const verified = searchParams.get('verified')
     const search = searchParams.get('search')
-    const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const skip = (page - 1) * limit
+    const offset = parseInt(searchParams.get('offset') || '0')
 
-    // Построение фильтров
     const where: any = {
       isActive: true
     }
 
-    if (type) {
+    if (type && type !== 'all') {
       where.type = type
     }
 
@@ -38,6 +26,10 @@ export async function GET(request: NextRequest) {
         contains: city,
         mode: 'insensitive'
       }
+    }
+
+    if (verified === 'true') {
+      where.isVerified = true
     }
 
     if (search) {
@@ -53,113 +45,34 @@ export async function GET(request: NextRequest) {
         include: {
           products: {
             where: { isAvailable: true },
-            take: 3 // Показываем только первые 3 продукта
+            take: 3
           },
           _count: {
-            select: { products: true }
+            select: { 
+              recommendations: true,
+              products: true
+            }
           }
         },
         orderBy: [
           { isVerified: 'desc' },
           { rating: 'desc' },
-          { reviewCount: 'desc' }
+          { name: 'asc' }
         ],
-        skip,
-        take: limit
+        take: limit,
+        skip: offset
       }),
       prisma.company.count({ where })
     ])
 
-    // Парсим JSON поля
-    const parsedCompanies = companies.map(company => ({
-      ...company,
-      services: company.services ? JSON.parse(company.services as string) : null,
-      workingHours: company.workingHours ? JSON.parse(company.workingHours as string) : null,
-      coordinates: company.coordinates ? JSON.parse(company.coordinates as string) : null,
-      products: company.products.map(product => ({
-        ...product,
-        tags: product.tags ? JSON.parse(product.tags as string) : null
-      }))
-    }))
-
     return NextResponse.json({
-      companies: parsedCompanies,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
+      companies,
+      total,
+      limit,
+      offset
     })
   } catch (error) {
     logger.error('Error fetching companies:', error)
-    return NextResponse.json({ error: 'Ошибка получения каталога компаний' }, { status: 500 })
-  }
-}
-
-// POST /api/marketplace/companies - создать новую компанию (только для админов)
-export async function POST(request: NextRequest) {
-  try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
-    }
-
-    // Проверка на админа (можно расширить логику)
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
-    }
-
-    const body = await request.json()
-    const {
-      name,
-      type,
-      description,
-      address,
-      city,
-      phone,
-      email,
-      website,
-      imageUrl,
-      services,
-      workingHours,
-      coordinates
-    } = body
-
-    // Валидация
-    if (!name || !type) {
-      return NextResponse.json({ error: 'Название и тип компании обязательны' }, { status: 400 })
-    }
-
-    const company = await prisma.company.create({
-      data: {
-        name,
-        type,
-        description,
-        address,
-        city,
-        phone,
-        email,
-        website,
-        imageUrl,
-        services: services ? JSON.stringify(services) : null,
-        workingHours: workingHours ? JSON.stringify(workingHours) : null,
-        coordinates: coordinates ? JSON.stringify(coordinates) : null
-      }
-    })
-
-    return NextResponse.json(company, { status: 201 })
-  } catch (error) {
-    logger.error('Error creating company:', error)
-    return NextResponse.json({ error: 'Ошибка создания компании' }, { status: 500 })
+    return NextResponse.json({ error: 'Ошибка получения списка компаний' }, { status: 500 })
   }
 }

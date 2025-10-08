@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
-import { createRecommendationsForUser } from '@/lib/ai-recommendations'
+import { createEnhancedRecommendationsForUser } from '@/lib/ai-recommendations-enhanced'
 import { logger } from '@/lib/logger'
 
 // POST /api/marketplace/recommendations/generate - сгенерировать новые рекомендации
@@ -17,11 +17,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
     }
 
-    const recommendations = await createRecommendationsForUser(decoded.userId)
+    // Получаем данные о геолокации из тела запроса (если есть)
+    let userLocation
+    try {
+      const body = await request.json()
+      userLocation = body.location
+    } catch {
+      // Если тело запроса пустое или некорректное, продолжаем без геолокации
+    }
+
+    const recommendations = await createEnhancedRecommendationsForUser(
+      decoded.userId,
+      userLocation
+    )
 
     return NextResponse.json({
-      message: `Создано ${recommendations.length} новых рекомендаций`,
-      recommendations
+      message: `Создано ${recommendations.length} новых персонализированных рекомендаций`,
+      recommendations,
+      count: recommendations.length
     })
   } catch (error) {
     logger.error('Error generating recommendations:', error)

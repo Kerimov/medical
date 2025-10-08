@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MapPin, Phone, Globe, Star, Heart, AlertCircle, TestTube, Pill, ShoppingBag } from 'lucide-react'
+import { MapPin, Phone, Globe, Star, Heart, AlertCircle, TestTube, Pill, ShoppingBag, Building2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 
@@ -196,6 +196,14 @@ export default function MarketplacePage() {
             Умные рекомендации на основе ваших анализов и состояния здоровья, 
             подобранные специально для вас
           </p>
+          <div className="mt-6">
+            <Link href="/marketplace/companies">
+              <Button variant="outline" size="lg" className="gap-2">
+                <Building2 className="w-5 h-5" />
+                Каталог клиник и лабораторий
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Фильтры и действия */}
