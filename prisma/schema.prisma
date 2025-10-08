@@ -327,3 +327,95 @@ model RecommendationInteraction {
   metadata         Json?          // Дополнительные данные о взаимодействии
   createdAt        DateTime       @default(now())
 }
+
+/// База знаний - медицинские справочники
+enum MethodologyType {
+  MINZDRAV_RF   // Минздрав РФ
+  US_STANDARDS   // Американские стандарты (CDC, NIH)
+  EU_STANDARDS   // Европейские стандарты (ESC, EASL)
+  WHO            // Всемирная организация здравоохранения
+  OTHER
+}
+
+model StudyType {
+  id              String      @id @default(cuid())
+  name            String      // Название исследования
+  nameEn          String?     // Английское название
+  code            String?     @unique // Код исследования (например, LOINC код)
+  category        String      // Категория (клиническая химия, гематология, и т.д.)
+  description     String?     // Описание исследования
+  clinicalSignificance String? // Клиническое значение
+  preparation     String?     // Подготовка к исследованию
+  biomaterial     String?     // Биоматериал (кровь, моча, и т.д.)
+  sources         Json?       // Ссылки на источники (UpToDate, MSD, Medscape, PubMed и др.)
+  lastUpdated     DateTime?   // Дата последнего обновления из источников
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  indicators      Indicator[]
+}
+
+model Indicator {
+  id                   String          @id @default(cuid())
+  studyTypeId          String
+  studyType            StudyType       @relation(fields: [studyTypeId], references: [id], onDelete: Cascade)
+  name                 String          // Название показателя
+  nameEn               String?         // Английское название
+  code                 String?         // Код показателя (например, LOINC)
+  shortName            String?         // Краткое название/аббревиатура
+  unit                 String          // Единица измерения (мг/дл, ммоль/л, и т.д.)
+  description          String?         // Описание показателя
+  clinicalSignificance String?         // Клиническое значение
+  increasedMeaning     String?         // Что означает повышение
+  decreasedMeaning     String?         // Что означает понижение
+  relatedConditions    Json?           // Связанные состояния/заболевания
+  synonyms             Json?           // Синонимы и альтернативные названия
+  sources              Json?           // Ссылки на источники (UpToDate, MSD, Medscape, PubMed и др.)
+  lastUpdated          DateTime?       // Дата последнего обновления из источников
+  isActive             Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  referenceRanges      ReferenceRange[]
+}
+
+model Methodology {
+  id              String          @id @default(cuid())
+  name            String          // Название методологии
+  type            MethodologyType
+  description     String?         // Описание методологии
+  organization    String?         // Организация (CDC, NIH, ESC, и т.д.)
+  country         String?         // Страна
+  version         String?         // Версия стандарта
+  effectiveFrom   DateTime?       // Дата вступления в силу
+  source          String?         // Источник/ссылка на документ
+  sources         Json?           // Дополнительные ссылки на источники
+  lastUpdated     DateTime?       // Дата последнего обновления из источников
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  referenceRanges ReferenceRange[]
+}
+
+model ReferenceRange {
+  id            String       @id @default(cuid())
+  indicatorId   String
+  indicator     Indicator    @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  methodologyId String
+  methodology   Methodology  @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  ageGroupMin   Float?       // Минимальный возраст (в годах)
+  ageGroupMax   Float?       // Максимальный возраст (в годах)
+  gender        String?      // Пол (male, female, all)
+  minValue      Float?       // Минимальное значение нормы
+  maxValue      Float?       // Максимальное значение нормы
+  optimalMin    Float?       // Оптимальное минимальное значение
+  optimalMax    Float?       // Оптимальное максимальное значение
+  criticalLow   Float?       // Критически низкое значение
+  criticalHigh  Float?       // Критически высокое значение
+  note          String?      // Дополнительная информация
+  conditions    Json?        // Особые условия применения
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@unique([indicatorId, methodologyId, gender, ageGroupMin, ageGroupMax])
+}

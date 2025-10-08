@@ -17,7 +17,8 @@ import {
   BarChart3,
   Shield,
   Database,
-  Eye
+  Eye,
+  BookOpen
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -324,6 +325,29 @@ export default function AdminPage() {
               <CardContent className="pt-0">
                 <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
                   <Bell className="mr-2 h-4 w-4" />
+                  Управлять
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/knowledge" className="block group">
+            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-blue-500/10 group-hover:scale-110 transition-transform duration-300">
+                    <BookOpen className="h-8 w-8 text-indigo-600" />
+                  </div>
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                </div>
+                <CardTitle className="text-xl mb-2 group-hover:text-indigo-600 transition-colors">База знаний</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Справочник исследований, показателей и нормативов по методологиям
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button className="w-full bg-gradient-to-r from-indigo-500 to-blue-500 text-white hover:opacity-90 transition-opacity shadow-medical">
+                  <BookOpen className="mr-2 h-4 w-4" />
                   Управлять
                 </Button>
               </CardContent>
