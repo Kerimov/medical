@@ -4,14 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "prisma:studio": "npx prisma studio",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
+    "prisma:deploy": "npx prisma migrate deploy",
+    "prisma:reset": "npx prisma migrate reset",
     "db:seed": "node prisma/seed.js",
-    "cleanup:recs": "node scripts/cleanup-duplicate-recommendations.js"
+    "cleanup:recs": "node scripts/cleanup-duplicate-recommendations.js",
+    "generate:jwt": "node scripts/generate-jwt-secret.js"
   },
   "dependencies": {
     "@prisma/client": "6.16.3",
