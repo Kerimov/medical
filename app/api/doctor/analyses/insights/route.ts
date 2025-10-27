@@ -80,7 +80,11 @@ export async function GET(request: NextRequest) {
       // simple fallback: count abnormal per indicator
       const counts: Record<string, { abn: number; total: number }> = {}
       for (const a of analyses) {
-        const inds = Array.isArray(a.indicators) ? a.indicators as any[] : []
+        let inds: any[] = []
+        try {
+          const r = a?.results ? JSON.parse(a.results as unknown as string) : {}
+          if (Array.isArray(r?.indicators)) inds = r.indicators
+        } catch {}
         for (const i of inds) {
           const key = i?.name || 'Показатель'
           if (!counts[key]) counts[key] = { abn: 0, total: 0 }

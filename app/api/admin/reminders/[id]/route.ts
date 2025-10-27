@@ -80,7 +80,7 @@ export async function PUT(
 
     const reminderId = params.id
     const body = await request.json()
-    const { isCompleted, title, description, dueAt } = body
+    const { title, description, dueAt } = body
 
     // Проверяем, что напоминание существует
     const reminderToUpdate = await prisma.reminder.findUnique({
@@ -95,7 +95,6 @@ export async function PUT(
     const updatedReminder = await prisma.reminder.update({
       where: { id: reminderId },
       data: {
-        isCompleted: isCompleted !== undefined ? isCompleted : reminderToUpdate.isCompleted,
         title: title || reminderToUpdate.title,
         description: description || reminderToUpdate.description,
         dueAt: dueAt || reminderToUpdate.dueAt

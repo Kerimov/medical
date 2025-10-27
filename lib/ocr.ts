@@ -1,5 +1,5 @@
 // OCR и парсинг медицинских документов
-import { createWorker } from 'tesseract.js'
+import { createWorker, PSM } from 'tesseract.js'
 
 export interface OCRResult {
   text: string
@@ -10,24 +10,12 @@ export interface OCRResult {
 export async function performTesseractOCR(imageData: string): Promise<OCRResult> {
   console.log('[Tesseract] Starting text recognition...')
   
-  const worker = await createWorker({
-    logger: (m) => {
-      if (m.status === 'recognizing text') {
-        console.log(`[Tesseract] Progress: ${Math.round((m.progress || 0) * 100)}%`)
-      } else {
-        console.log(`[Tesseract] ${m.status}`)
-      }
-    }
-  })
+  const worker = await createWorker('rus+eng')
   
   try {
-    // Загружаем языки (русский и английский)
-    await worker.loadLanguage('rus+eng')
-    await worker.initialize('rus+eng')
-    
     // Настройки для лучшего распознавания медицинских документов
     await worker.setParameters({
-      tessedit_pageseg_mode: 1, // Автоматическая сегментация с OSD
+      tessedit_pageseg_mode: PSM.AUTO_OSD, // Автоматическая сегментация с OSD
       preserve_interword_spaces: '1',
     })
     

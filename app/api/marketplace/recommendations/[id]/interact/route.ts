@@ -50,7 +50,7 @@ export async function POST(
       data: {
         recommendationId: params.id,
         action,
-        metadata: metadata ? JSON.stringify(metadata) : null
+        metadata: metadata ? JSON.stringify(metadata) : undefined
       }
     })
 
@@ -78,7 +78,7 @@ export async function POST(
       newStatus
     })
   } catch (error) {
-    logger.error('Error recording recommendation interaction:', error)
+    logger.error('Error recording recommendation interaction:', error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: 'Ошибка записи взаимодействия' }, { status: 500 })
   }
 }

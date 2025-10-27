@@ -57,7 +57,7 @@ interface ReferenceRange {
 }
 
 export default function KnowledgeBasePage() {
-  const { user, token, loading } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [studyTypes, setStudyTypes] = useState<StudyType[]>([]);
   const [filteredStudyTypes, setFilteredStudyTypes] = useState<StudyType[]>([]);
@@ -72,10 +72,10 @@ export default function KnowledgeBasePage() {
     const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
     
     // Перенаправляем только если загрузка завершена, нет пользователя и нет токена
-    if (!loading && !user && !hasToken) {
+    if (!authLoading && !user && !hasToken) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (token) {
@@ -156,7 +156,7 @@ export default function KnowledgeBasePage() {
   };
 
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
         <div className="text-center">

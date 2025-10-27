@@ -64,10 +64,6 @@ export async function GET(request: NextRequest) {
             studyDate: true,
             laboratory: true
           }
-        },
-        comments: {
-          orderBy: { createdAt: 'desc' },
-          take: 3
         }
       },
       orderBy: { createdAt: 'desc' }

@@ -11,7 +11,7 @@
  * - Автоматически определяет референсные значения
  */
 
-import { MedicalData } from './ocr'
+import { ParsedMedicalData } from './ocr'
 import { logger } from './logger'
 
 interface AIParserConfig {
@@ -83,7 +83,7 @@ const MEDICAL_EXTRACTION_PROMPT = `Ты - эксперт по анализу м�
 export async function parseWithAI(
   ocrText: string,
   config: AIParserConfig
-): Promise<MedicalData> {
+): Promise<ParsedMedicalData> {
   logger.info('Starting AI-powered medical data extraction', 'AI-PARSER', { provider: config.provider, model: config.model || 'default' })
   
   try {
@@ -110,7 +110,7 @@ export async function parseWithAI(
     const data = JSON.parse(response)
     
     // Валидация и нормализация данных
-    const medicalData: MedicalData = {
+    const medicalData: ParsedMedicalData = {
       studyType: data.studyType || undefined,
       studyDate: data.studyDate ? new Date(data.studyDate) : undefined,
       laboratory: data.laboratory || undefined,

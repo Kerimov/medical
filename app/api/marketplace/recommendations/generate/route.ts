@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       count: recommendations.length
     })
   } catch (error) {
-    logger.error('Error generating recommendations:', error)
+    logger.error('Error generating recommendations:', error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: 'Ошибка генерации рекомендаций' }, { status: 500 })
   }
 }

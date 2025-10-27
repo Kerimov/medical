@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       offset
     })
   } catch (error) {
-    logger.error('Error fetching companies:', error)
+    logger.error('Error fetching companies:', error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: 'Ошибка получения списка компаний' }, { status: 500 })
   }
 }

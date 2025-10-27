@@ -46,7 +46,7 @@ interface ReferenceRange {
 }
 
 export default function KnowledgeBasePage() {
-  const { user, token, loading } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'study-types' | 'indicators' | 'methodologies' | 'ranges'>('study-types');
   const [studyTypes, setStudyTypes] = useState<StudyType[]>([]);
@@ -82,10 +82,10 @@ export default function KnowledgeBasePage() {
     const hasToken = typeof window !== 'undefined' && localStorage.getItem('token');
     
     // Перенаправляем только если загрузка завершена, нет токена и (нет пользователя или он не админ)
-    if (!loading && !hasToken && (!user || user.role !== 'ADMIN')) {
+    if (!authLoading && !hasToken && (!user || user.role !== 'ADMIN')) {
       router.push('/dashboard');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (token) {
@@ -217,7 +217,7 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
         <div className="text-center">
@@ -445,7 +445,7 @@ export default function KnowledgeBasePage() {
         {/* Списки данных */}
         {activeTab === 'study-types' && (
           <div className="grid gap-4">
-            {isLoading ? (
+            {authLoading ? (
               <p>Загрузка...</p>
             ) : filteredStudyTypes.length === 0 ? (
               <Card>
@@ -495,7 +495,7 @@ export default function KnowledgeBasePage() {
 
         {activeTab === 'methodologies' && (
           <div className="grid gap-4">
-            {isLoading ? (
+            {authLoading ? (
               <p>Загрузка...</p>
             ) : filteredMethodologies.length === 0 ? (
               <Card>

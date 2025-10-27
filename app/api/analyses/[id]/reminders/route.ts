@@ -58,13 +58,13 @@ export async function POST(
 
       // Проверяем различные структуры данных
       if (results && typeof results === 'object') {
-        if (Array.isArray(results.indicators)) {
-          indicators = results.indicators
+        if (Array.isArray((results as any).indicators)) {
+          indicators = (results as any).indicators
         } else if (Array.isArray(results)) {
           indicators = results
-        } else if (results.indicators && typeof results.indicators === 'object') {
+        } else if ((results as any).indicators && typeof (results as any).indicators === 'object') {
           // Если indicators это объект, преобразуем в массив
-          indicators = Object.values(results.indicators)
+          indicators = Object.values((results as any).indicators)
         }
       }
 

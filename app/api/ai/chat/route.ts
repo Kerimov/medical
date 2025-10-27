@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { documentsDb } from '@/lib/documents'
+import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     if (token) {
       const payload = verifyToken(token)
-      userId = payload?.userId
+      userId = payload?.userId || null
     }
 
     // Получаем контекст документов, если они прикреплены
@@ -95,15 +95,17 @@ export async function POST(request: NextRequest) {
       console.log('[AI-CHAT] Processing with', documentIds.length, 'attached documents')
       
       for (const docId of documentIds) {
-        const doc = documentsDb.findById(docId)
-        if (doc && doc.userId === userId) {
+        const doc = await prisma.document.findUnique({
+          where: { id: docId, userId: userId }
+        })
+        if (doc) {
           documentsContext += `\n\n[ДОКУМЕНТ: ${doc.fileName}]\n`
           documentsContext += `Тип исследования: ${doc.studyType || 'Не определен'}\n`
           documentsContext += `Дата: ${doc.studyDate ? new Date(doc.studyDate).toLocaleDateString('ru-RU') : 'Не указана'}\n`
           
-          if (doc.indicators && doc.indicators.length > 0) {
+          if (doc.indicators && Array.isArray(doc.indicators)) {
             documentsContext += '\nПоказатели:\n'
-            doc.indicators.forEach(ind => {
+            doc.indicators.forEach((ind: any) => {
               const status = ind.isNormal ? '✅ В норме' : '❌ Отклонение'
               documentsContext += `- ${ind.name}: ${ind.value} ${ind.unit || ''} (норма: ${ind.referenceMin}-${ind.referenceMax}) ${status}\n`
             })

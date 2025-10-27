@@ -38,7 +38,7 @@ export async function GET(
 
     return NextResponse.json({ company })
   } catch (error) {
-    logger.error('Error fetching company:', error)
+    logger.error('Error fetching company:', error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: 'Ошибка получения информации о компании' }, { status: 500 })
   }
 }

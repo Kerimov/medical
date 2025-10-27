@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
           take: limit
         })
       } catch (e) {
-        logger.error('Auto-materialization failed:', e)
+        logger.error('Auto-materialization failed:', e instanceof Error ? e.message : String(e))
       }
     }
 

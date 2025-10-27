@@ -145,7 +145,7 @@ export default function PatientCardPage() {
                     <div key={dateLabel}>
                       <div className="text-xs font-medium text-gray-500 mb-2">{dateLabel}</div>
                       <div className="space-y-3">
-                        {items.map((a:any)=> (
+                        {(items as any[]).map((a:any)=> (
                           <div key={a.id} className="p-3 rounded-lg bg-white/70 border flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white flex items-center justify-center">

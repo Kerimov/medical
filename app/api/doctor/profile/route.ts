@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         clinic: clinic || null,
         address: address || null,
         consultationFee: consultationFee || null,
-        workingHours: workingHours ? JSON.stringify(workingHours) : null,
+        workingHours: workingHours ? JSON.stringify(workingHours) : undefined,
         isVerified: false,
         isActive: true
       },

@@ -621,8 +621,8 @@ async function getRecommendations(params: any, userId: string) {
     recommendations.forEach((rec, index) => {
       message += `${index + 1}. ${rec.title}\n`
       message += `   📝 ${rec.description}\n`
-      if (rec.category) {
-        message += `   🏷️ Категория: ${rec.category}\n`
+      if (rec.type) {
+        message += `   🏷️ Тип: ${rec.type}\n`
       }
       message += `\n`
     })
