@@ -15,7 +15,8 @@
     "prisma:reset": "npx prisma migrate reset",
     "db:seed": "node prisma/seed.js",
     "cleanup:recs": "node scripts/cleanup-duplicate-recommendations.js",
-    "generate:jwt": "node scripts/generate-jwt-secret.js"
+    "generate:jwt": "node scripts/generate-jwt-secret.js",
+    "deploy:help": "node scripts/deploy-helper.js"
   },
   "dependencies": {
     "@prisma/client": "6.16.3",
