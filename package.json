@@ -19,7 +19,8 @@
     "deploy:help": "node scripts/deploy-helper.js"
   },
   "dependencies": {
-    "@prisma/client": "6.16.3",
+    "@prisma/client": "^6.18.0",
+    "@prisma/extension-accelerate": "^2.0.2",
     "@radix-ui/react-select": "^2.2.6",
     "@types/node": "^20.12.7",
     "@types/react": "^18.3.0",
@@ -35,7 +36,7 @@
     "next": "^14.2.0",
     "openai": "^6.2.0",
     "postcss": "^8.4.38",
-    "prisma": "6.16.3",
+    "prisma": "^6.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.3.0",
