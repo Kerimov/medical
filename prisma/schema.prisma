@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("pma_PRISMA_DATABASE_URL")
-  directUrl = env("pma_POSTGRES_URL")
 }
 
 enum UserRole {
