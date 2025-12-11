@@ -206,13 +206,14 @@ export default function DiaryPage() {
   if (!user) return null
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Дневник здоровья</h1>
-        <Button variant="outline" onClick={() => router.back()}>Назад</Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Дневник здоровья</h1>
+          <Button variant="outline" onClick={() => router.back()}>Назад</Button>
+        </div>
 
-      <Card>
+      <Card className="bg-white/60">
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -299,7 +300,7 @@ export default function DiaryPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white/60">
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -475,7 +476,7 @@ export default function DiaryPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white/60">
         <CardHeader>
           <CardTitle>Новая запись</CardTitle>
         </CardHeader>
@@ -537,7 +538,7 @@ export default function DiaryPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-white/60">
         <CardHeader>
           <CardTitle>Записи</CardTitle>
         </CardHeader>
@@ -606,6 +607,7 @@ export default function DiaryPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

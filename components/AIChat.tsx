@@ -309,7 +309,16 @@ export function AIChat() {
                 {/* Источники (RAG) */}
                 {message.role === 'assistant' && Array.isArray(message.sources) && message.sources.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
-                    {message.sources.slice(0, 6).map((s, idx) => {
+                    {(() => {
+                      const seen = new Set<string>()
+                      const unique = message.sources.filter((s) => {
+                        const key = String(s.url || `${s.sourceType || 'src'}:${s.id || s.label || ''}`)
+                        if (seen.has(key)) return false
+                        seen.add(key)
+                        return true
+                      })
+                      return unique.slice(0, 6)
+                    })().map((s, idx) => {
                       const label = (s.label || s.sourceType || `SOURCE ${idx + 1}`).toString()
                       return s.url ? (
                         <a key={`${s.id || idx}`} href={s.url} className="text-xs">

@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { Pill, ShieldAlert, Clock, Plus, Trash2, Sparkles, Bell } from 'lucide-react'
 
 type Medication = {
   id: string
@@ -140,141 +142,244 @@ export default function MedicationsPage() {
 
   if (!user) return null
 
+  const supplementsCount = meds.filter((m) => m.isSupplement).length
+
+  const severityBadge = (sev: string) => {
+    const s = String(sev || '').toLowerCase()
+    if (s === 'danger') return <Badge className="bg-red-100 text-red-800">Высокий</Badge>
+    if (s === 'warning') return <Badge className="bg-yellow-100 text-yellow-800">Внимание</Badge>
+    return <Badge className="bg-blue-100 text-blue-800">Инфо</Badge>
+  }
+
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Лекарства</h1>
-          <p className="text-muted-foreground">Список препаратов/БАДов + проверка взаимодействий + расписание → напоминания.</p>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
+      <div className="container mx-auto py-8 space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Лекарства</h1>
+            <p className="text-muted-foreground">Список препаратов/БАДов → проверка → расписание → напоминания.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/reminders">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Напоминания
+              </Button>
+            </Link>
+          </div>
         </div>
-        <Link href="/reminders">
-          <Button variant="outline">Открыть напоминания</Button>
-        </Link>
-      </div>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
+        {error && <div className="text-sm text-destructive">{error}</div>}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Добавить</CardTitle>
-          <CardDescription>Введите как на упаковке (желательно международное наименование в скобках).</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-1">
-            <Label>Название *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Напр. Метформин (metformin)" />
-          </div>
-          <div>
-            <Label>Дозировка</Label>
-            <Input value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} placeholder="500 мг" />
-          </div>
-          <div>
-            <Label>Кратность в день</Label>
-            <Input type="number" min={1} max={6} value={form.frequencyPerDay} onChange={(e) => setForm({ ...form, frequencyPerDay: Number(e.target.value) })} />
-          </div>
-          <div className="md:col-span-2">
-            <Label>Время (опционально)</Label>
-            <Input value={form.times} onChange={(e) => setForm({ ...form, times: e.target.value })} placeholder="08:00, 20:00" />
-          </div>
-          <div>
-            <Label>БАД</Label>
-            <div className="flex items-center gap-2 h-9">
-              <input type="checkbox" checked={!!form.isSupplement} onChange={(e) => setForm({ ...form, isSupplement: e.target.checked })} />
-              <span className="text-sm text-muted-foreground">Да</span>
-            </div>
-          </div>
-          <div className="md:col-span-3">
-            <Label>Заметки</Label>
-            <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="После еды / натощак / курс..." />
-          </div>
-          <div className="md:col-span-3 flex gap-2">
-            <Button onClick={createMedication}>Добавить</Button>
-            <Button variant="outline" onClick={() => setForm({ name: '', dosage: '', frequencyPerDay: 1, times: '', notes: '', isSupplement: false })}>
-              Сбросить
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>Список</CardTitle>
-              <CardDescription>Для расписания и напоминаний используем кратность/время.</CardDescription>
-            </div>
-            <Button onClick={generatePlanAndReminders} disabled={planBusy || meds.length === 0}>
-              {planBusy ? 'Проверяю...' : 'Проверить + создать напоминания'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {meds.length === 0 ? (
-            <div className="text-sm text-muted-foreground">Пока пусто</div>
-          ) : (
-            <div className="space-y-2">
-              {meds.map((m) => {
-                const times = Array.isArray(m.times) ? m.times : []
-                return (
-                  <div key={m.id} className="p-3 border rounded-md flex flex-col md:flex-row md:items-center gap-2 justify-between">
-                    <div>
-                      <div className="font-medium">
-                        {m.name} {m.isSupplement ? <span className="text-xs text-muted-foreground">(БАД)</span> : null}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {[m.dosage, m.frequencyPerDay ? `${m.frequencyPerDay}×/день` : null, times.length ? `время: ${times.join(', ')}` : null]
-                          .filter(Boolean)
-                          .join(' • ')}
-                      </div>
-                      {m.notes ? <div className="text-sm mt-1">{m.notes}</div> : null}
-                    </div>
-                    <div>
-                      <Button variant="outline" onClick={() => deleteMedication(m.id)}>Удалить</Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {planError && <div className="text-sm text-destructive mt-4">{planError}</div>}
-          {plan && (
-            <div className="mt-4 space-y-3">
-              <div className="text-sm">
-                <div className="font-medium">Результат</div>
-                <div className="whitespace-pre-wrap">{plan.tldr}</div>
+        {/* Quick stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Всего в списке</div>
+                  <div className="text-2xl font-semibold">{meds.length}</div>
+                </div>
+                <Pill className="h-7 w-7 text-primary" />
               </div>
-              {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
-                <div className="text-sm">
-                  <div className="font-medium">Предупреждения</div>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {plan.warnings.slice(0, 12).map((w: any, idx: number) => (
-                      <li key={idx}>{w.text || String(w)}</li>
-                    ))}
-                  </ul>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">БАДы</div>
+                  <div className="text-2xl font-semibold">{supplementsCount}</div>
                 </div>
-              )}
-              {Array.isArray(plan.schedule) && plan.schedule.length > 0 && (
-                <div className="text-sm">
-                  <div className="font-medium">Расписание</div>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {plan.schedule.slice(0, 20).map((s: any, idx: number) => (
-                      <li key={idx}>
-                        {s.name}: {(Array.isArray(s.times) ? s.times : []).join(', ')}
-                      </li>
-                    ))}
-                  </ul>
+                <Sparkles className="h-7 w-7 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Проверка + режим</div>
+                  <div className="text-xs text-muted-foreground">создаёт ежедневные напоминания</div>
                 </div>
-              )}
-              {Array.isArray(plan.createdReminders) && plan.createdReminders.length > 0 && (
-                <div className="text-sm text-muted-foreground">
-                  Создано напоминаний: {plan.createdReminders.length}. Проверьте в разделе “Напоминания”.
-                </div>
-              )}
+                <ShieldAlert className="h-7 w-7 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Добавить препарат
+            </CardTitle>
+            <CardDescription>Введите как на упаковке (желательно МНН в скобках).</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="md:col-span-3">
+              <Label>Название *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Напр. Метформин (metformin)" />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="md:col-span-1">
+              <Label>Дозировка</Label>
+              <Input value={form.dosage} onChange={(e) => setForm({ ...form, dosage: e.target.value })} placeholder="500 мг" />
+            </div>
+            <div className="md:col-span-1">
+              <Label>Раз/день</Label>
+              <Input type="number" min={1} max={6} value={form.frequencyPerDay} onChange={(e) => setForm({ ...form, frequencyPerDay: Number(e.target.value) })} />
+            </div>
+            <div className="md:col-span-1">
+              <Label>БАД</Label>
+              <div className="flex items-center gap-2 h-9">
+                <input type="checkbox" checked={!!form.isSupplement} onChange={(e) => setForm({ ...form, isSupplement: e.target.checked })} />
+                <span className="text-sm text-muted-foreground">Да</span>
+              </div>
+            </div>
+            <div className="md:col-span-3">
+              <Label>Время (опционально)</Label>
+              <Input value={form.times} onChange={(e) => setForm({ ...form, times: e.target.value })} placeholder="08:00, 20:00" />
+              <div className="text-xs text-muted-foreground mt-1">Если не указать — подберём базовые времена по кратности.</div>
+            </div>
+            <div className="md:col-span-3">
+              <Label>Заметки</Label>
+              <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="После еды / натощак / курс..." />
+            </div>
+            <div className="md:col-span-6 flex gap-2">
+              <Button onClick={createMedication}>Добавить</Button>
+              <Button variant="outline" onClick={() => setForm({ name: '', dosage: '', frequencyPerDay: 1, times: '', notes: '', isSupplement: false })}>
+                Сбросить
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Список</CardTitle>
+                <CardDescription>Дальше: “Проверить” сформирует расписание и (опционально) создаст напоминания.</CardDescription>
+              </div>
+              <Button onClick={generatePlanAndReminders} disabled={planBusy || meds.length === 0} className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4" />
+                {planBusy ? 'Проверяю...' : 'Проверить + напоминания'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {meds.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Пока пусто</div>
+            ) : (
+              <div className="space-y-2">
+                {meds.map((m) => {
+                  const times = Array.isArray(m.times) ? m.times : []
+                  return (
+                    <div key={m.id} className="p-4 border rounded-lg bg-white/50 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="font-medium truncate">{m.name}</div>
+                          {m.isSupplement ? <Badge variant="secondary">БАД</Badge> : <Badge variant="outline">Лекарство</Badge>}
+                          {m.frequencyPerDay ? <Badge variant="outline">{m.frequencyPerDay}×/день</Badge> : null}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                          {m.dosage ? <span>{m.dosage}</span> : null}
+                          {times.length > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              {times.slice(0, 6).map((t: any) => (
+                                <Badge key={String(t)} variant="secondary" className="ml-1">{String(t)}</Badge>
+                              ))}
+                            </span>
+                          ) : null}
+                        </div>
+                        {m.notes ? <div className="text-sm mt-2 whitespace-pre-wrap">{m.notes}</div> : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => deleteMedication(m.id)} className="flex items-center gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Удалить
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {planError && <div className="text-sm text-destructive mt-4">{planError}</div>}
+
+            {plan && (
+              <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="bg-white/60">
+                  <CardHeader>
+                    <CardTitle className="text-base">Результат</CardTitle>
+                    <CardDescription>Кратко и по делу.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    <div className="whitespace-pre-wrap">{plan.tldr}</div>
+                    {Array.isArray(plan.createdReminders) && plan.createdReminders.length > 0 && (
+                      <div className="text-muted-foreground">
+                        Создано напоминаний: <span className="font-medium">{plan.createdReminders.length}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/60">
+                  <CardHeader>
+                    <CardTitle className="text-base">Предупреждения</CardTitle>
+                    <CardDescription>Проверяйте с врачом/фармацевтом.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-2">
+                    {Array.isArray(plan.warnings) && plan.warnings.length > 0 ? (
+                      <div className="space-y-2">
+                        {plan.warnings.slice(0, 12).map((w: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-md bg-background/60">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="font-medium">Проверка</div>
+                              {severityBadge(w?.severity)}
+                            </div>
+                            <div className="mt-1 text-muted-foreground">{w?.text || String(w)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">Нет явных предупреждений по базовым правилам.</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {Array.isArray(plan.schedule) && plan.schedule.length > 0 && (
+                  <Card className="bg-white/60 lg:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-base">Расписание</CardTitle>
+                      <CardDescription>Времена приёма; можно править в списке и перепроверить.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="space-y-2">
+                        {plan.schedule.slice(0, 20).map((s: any, idx: number) => (
+                          <div key={idx} className="p-3 border rounded-md bg-background/60">
+                            <div className="font-medium">{s.name}</div>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {(Array.isArray(s.times) ? s.times : []).slice(0, 6).map((t: any) => (
+                                <Badge key={String(t)} variant="secondary">{String(t)}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Напоминания создаются в разделе <Link href="/reminders" className="text-primary hover:underline">“Напоминания”</Link>.
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

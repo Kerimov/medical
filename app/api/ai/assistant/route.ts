@@ -1125,7 +1125,16 @@ async function buildRagContext(userId: string, message: string, documentIds: str
   }
 
   scored.sort((a, b) => b.score - a.score)
-  const top = scored.slice(0, 6)
+  // Важно: дедуп по документу. Иначе если один документ дал несколько релевантных чанков,
+  // в UI будут дублироваться одинаковые "источники".
+  const top: typeof scored = []
+  const seenDoc = new Set<string>()
+  for (const x of scored) {
+    if (top.length >= 6) break
+    if (seenDoc.has(x.docId)) continue
+    seenDoc.add(x.docId)
+    top.push(x)
+  }
 
   const sources: RagSource[] = top.map((x) => ({
     sourceType: 'document',
@@ -1374,7 +1383,17 @@ async function buildAllUserRagContext(userId: string, message: string) {
     if (picked.some((p) => p.source.sourceType === x.source.sourceType && p.source.id === x.source.id && p.snippet === x.snippet)) continue
     picked.push(x)
   }
-  const top = picked.slice(0, 10)
+  // Дедуп по источнику (sourceType + id), чтобы не возвращать несколько чанков одного и того же анализа/документа.
+  const topUnique: typeof picked = []
+  const seenSrc = new Set<string>()
+  for (const x of picked) {
+    if (topUnique.length >= 10) break
+    const key = `${x.source.sourceType}:${x.source.id}`
+    if (seenSrc.has(key)) continue
+    seenSrc.add(key)
+    topUnique.push(x)
+  }
+  const top = topUnique
 
   const sources: RagSource[] = top.map((x) => ({ ...x.source, snippet: x.snippet }))
   const promptBlocks = top.map((x, idx) => {
