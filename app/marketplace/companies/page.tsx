@@ -399,9 +399,23 @@ export default function CompaniesPage() {
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
             Каталог компаний
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Найдите проверенные клиники, лаборатории, аптеки и магазины здорового питания в вашем городе
           </p>
+          {locationDetected && cityFilter && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg shadow-sm">
+              <MapPin className="w-5 h-5 text-green-600" />
+              <div>
+                <span className="text-sm text-gray-600">Ваше местоположение: </span>
+                <span className="text-sm font-semibold text-green-700">{cityFilter}</span>
+                {userCoordinates && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Фильтры */}
@@ -477,10 +491,24 @@ export default function CompaniesPage() {
                   </Button>
                 </div>
                 {locationDetected && cityFilter && (
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-green-600 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      Определено автоматически: {cityFilter}
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
+                        <MapPin className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-green-800">
+                          Местоположение определено
+                        </div>
+                        <div className="text-xs text-green-600">
+                          Город: <span className="font-semibold">{cityFilter}</span>
+                          {userCoordinates && (
+                            <span className="ml-2 text-gray-500">
+                              ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <Button
                       type="button"
@@ -492,16 +520,19 @@ export default function CompaniesPage() {
                         setUserCoordinates(null)
                         fetchCompanies()
                       }}
-                      className="text-xs h-auto p-1 text-gray-500 hover:text-gray-700"
+                      className="text-xs h-auto p-1 text-gray-500 hover:text-gray-700 hover:bg-green-100"
+                      title="Сбросить определенное местоположение"
                     >
                       ✕ Сбросить
                     </Button>
                   </div>
                 )}
                 {detectingLocation && (
-                  <div className="text-xs text-blue-600 flex items-center gap-1">
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                    Определение местоположения...
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <div className="text-sm text-blue-700">
+                      Определение местоположения...
+                    </div>
                   </div>
                 )}
 
