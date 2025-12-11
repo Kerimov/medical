@@ -58,6 +58,10 @@ export default function CompaniesPage() {
   const [cityFilter, setCityFilter] = useState('')
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [total, setTotal] = useState(0)
+  const [availableCities, setAvailableCities] = useState<string[]>([])
+  const [locationDetected, setLocationDetected] = useState(false)
+  const [detectingLocation, setDetectingLocation] = useState(false)
+  const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null)
 
   const fetchCompanies = async () => {
     try {
@@ -68,6 +72,10 @@ export default function CompaniesPage() {
       if (cityFilter) params.append('city', cityFilter)
       if (searchQuery) params.append('search', searchQuery)
       if (verifiedOnly) params.append('verified', 'true')
+      if (userCoordinates) {
+        params.append('lat', userCoordinates.lat.toString())
+        params.append('lng', userCoordinates.lng.toString())
+      }
       params.append('limit', '20')
 
       const response = await fetch(`/api/marketplace/companies?${params}`)
@@ -89,6 +97,90 @@ export default function CompaniesPage() {
   useEffect(() => {
     fetchCompanies()
   }, [selectedType, cityFilter, verifiedOnly])
+
+  // Загружаем список доступных городов
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const response = await fetch('/api/marketplace/cities')
+        if (response.ok) {
+          const data = await response.json()
+          setAvailableCities(data.cities || [])
+        }
+      } catch (error) {
+        console.error('Error fetching cities:', error)
+      }
+    }
+    fetchCities()
+  }, [])
+
+  // Автоматическое определение местоположения
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Геолокация не поддерживается вашим браузером')
+      return
+    }
+
+    setDetectingLocation(true)
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          
+          // Используем обратное геокодирование для определения города
+          // Можно использовать бесплатный API или просто показать координаты
+          // Для простоты используем координаты для поиска ближайших компаний
+          
+          // Пробуем определить город через API (можно использовать бесплатный сервис)
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`)
+          const data = await response.json()
+          
+          const city = data.address?.city || data.address?.town || data.address?.village
+          
+          // Сохраняем координаты для сортировки по расстоянию
+          setUserCoordinates({ lat: latitude, lng: longitude })
+          
+          if (city) {
+            // Ищем похожий город в списке доступных
+            const matchedCity = availableCities.find(c => 
+              c.toLowerCase().includes(city.toLowerCase()) || 
+              city.toLowerCase().includes(c.toLowerCase())
+            )
+            
+            if (matchedCity) {
+              setCityFilter(matchedCity)
+              setLocationDetected(true)
+            } else {
+              setCityFilter(city)
+              setLocationDetected(true)
+            }
+          } else {
+            // Даже если город не определен, используем координаты для сортировки
+            setLocationDetected(true)
+          }
+          
+          // Обновляем список компаний с учетом координат
+          await fetchCompanies()
+        } catch (error) {
+          console.error('Error detecting location:', error)
+          alert('Ошибка определения местоположения')
+        } finally {
+          setDetectingLocation(false)
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error)
+        alert('Не удалось определить местоположение. Разрешите доступ к геолокации или выберите город вручную.')
+        setDetectingLocation(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    )
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,12 +258,47 @@ export default function CompaniesPage() {
                   </SelectContent>
                 </Select>
 
-                <Input
-                  placeholder="Город..."
-                  value={cityFilter}
-                  onChange={(e) => setCityFilter(e.target.value)}
-                  className="border-0 bg-white/50"
-                />
+                <div className="flex gap-2 flex-1">
+                  <Select value={cityFilter} onValueChange={setCityFilter}>
+                    <SelectTrigger className="flex-1 border-0 bg-white/50">
+                      <SelectValue placeholder="Выберите город" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Все города</SelectItem>
+                      {availableCities.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={detectLocation}
+                    disabled={detectingLocation}
+                    className="border-0 bg-white/50"
+                    title="Определить местоположение автоматически"
+                  >
+                    {detectingLocation ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        Определение...
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-4 h-4 mr-2" />
+                        Авто
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {locationDetected && cityFilter && (
+                  <div className="text-xs text-green-600 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    Определено автоматически: {cityFilter}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2">
                   <input
@@ -258,9 +385,16 @@ export default function CompaniesPage() {
                         {company.address && (
                           <div className="flex items-start gap-2 text-gray-600">
                             <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                            <span className="line-clamp-1">
-                              {company.address}{company.city && `, ${company.city}`}
-                            </span>
+                            <div className="flex-1">
+                              <span className="line-clamp-1">
+                                {company.address}{company.city && `, ${company.city}`}
+                              </span>
+                              {(company as any).distance !== undefined && (company as any).distance !== Infinity && (
+                                <span className="text-xs text-blue-600 ml-2">
+                                  • {(company as any).distance.toFixed(1)} км
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
 
