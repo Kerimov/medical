@@ -224,6 +224,9 @@ export default function CompaniesPage() {
                 setLocationDetected(true)
                 setUserCoordinates({ lat: latitude, lng: longitude })
                 await fetchCompanies()
+              } finally {
+                // Всегда останавливаем индикатор загрузки
+                setDetectingLocation(false)
               }
             } catch (error) {
               console.error('❌ Ошибка обработки местоположения:', error)
@@ -232,6 +235,7 @@ export default function CompaniesPage() {
               if (!success) {
                 alert('Не удалось автоматически определить город. Выберите город вручную из списка.')
               }
+              // setDetectingLocation(false) уже вызывается в tryIPGeolocation
             }
           },
           async (error) => {
@@ -285,72 +289,80 @@ export default function CompaniesPage() {
       console.log('🌐 Пробуем определить город по IP...')
       const response = await fetch('/api/marketplace/geolocation/ip')
       
-      if (response.ok) {
-        const data = await response.json()
-        console.log('🌍 IP геолокация ответ:', data)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('🌍 IP геолокация ответ:', data)
+      
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      if (data.city) {
+        // Нормализуем название города
+        const normalizeCityName = (name: string) => {
+          return name
+            .toLowerCase()
+            .replace(/^г\.?\s*/i, '')
+            .replace(/\s+город.*$/i, '')
+            .replace(/[-\s]/g, '')
+            .trim()
+        }
         
-        if (data.city) {
-          // Нормализуем название города
-          const normalizeCityName = (name: string) => {
-            return name
-              .toLowerCase()
-              .replace(/^г\.?\s*/i, '')
-              .replace(/\s+город.*$/i, '')
-              .replace(/[-\s]/g, '')
-              .trim()
-          }
-          
-          const normalizedCity = normalizeCityName(data.city)
-          
-          // Ищем похожий город в списке доступных
-          const matchedCity = availableCities.find(c => {
-            const normalizedAvailable = normalizeCityName(c)
-            return normalizedAvailable === normalizedCity ||
-                   normalizedAvailable.includes(normalizedCity) ||
-                   normalizedCity.includes(normalizedAvailable)
-          })
-          
-          // Специальные случаи
-          const cityAliases: Record<string, string[]> = {
-            'санкт-петербург': ['спб', 'петербург', 'ленинград'],
-            'москва': ['мск'],
-            'нижний новгород': ['нн', 'нижний'],
-            'ростов-на-дону': ['ростов'],
-            'набережные челны': ['челны']
-          }
-          
-          let finalCity = matchedCity
-          if (!finalCity && cityAliases[normalizedCity]) {
-            const aliases = cityAliases[normalizedCity]
-            for (const alias of aliases) {
-              const found = availableCities.find(c => 
-                normalizeCityName(c).includes(alias) || 
-                alias.includes(normalizeCityName(c))
-              )
-              if (found) {
-                finalCity = found
-                break
-              }
+        const normalizedCity = normalizeCityName(data.city)
+        
+        // Ищем похожий город в списке доступных
+        const matchedCity = availableCities.find(c => {
+          const normalizedAvailable = normalizeCityName(c)
+          return normalizedAvailable === normalizedCity ||
+                 normalizedAvailable.includes(normalizedCity) ||
+                 normalizedCity.includes(normalizedAvailable)
+        })
+        
+        // Специальные случаи
+        const cityAliases: Record<string, string[]> = {
+          'санкт-петербург': ['спб', 'петербург', 'ленинград'],
+          'москва': ['мск'],
+          'нижний новгород': ['нн', 'нижний'],
+          'ростов-на-дону': ['ростов'],
+          'набережные челны': ['челны']
+        }
+        
+        let finalCity = matchedCity
+        if (!finalCity && cityAliases[normalizedCity]) {
+          const aliases = cityAliases[normalizedCity]
+          for (const alias of aliases) {
+            const found = availableCities.find(c => 
+              normalizeCityName(c).includes(alias) || 
+              alias.includes(normalizeCityName(c))
+            )
+            if (found) {
+              finalCity = found
+              break
             }
           }
-          
-          const cityToUse = finalCity || data.city
-          setCityFilter(cityToUse)
-          setLocationDetected(true)
-          if (data.coordinates) {
-            setUserCoordinates(data.coordinates)
-          }
-          await fetchCompanies()
-          setDetectingLocation(false)
-          return true
         }
+        
+        const cityToUse = finalCity || data.city
+        setCityFilter(cityToUse)
+        setLocationDetected(true)
+        if (data.coordinates) {
+          setUserCoordinates(data.coordinates)
+        }
+        await fetchCompanies()
+        return true
       }
+      
+      return false
     } catch (ipError) {
       console.error('❌ Ошибка IP геолокации:', ipError)
+      return false
+    } finally {
+      // Всегда останавливаем индикатор загрузки
+      setDetectingLocation(false)
     }
-    
-    setDetectingLocation(false)
-    return false
   }
 
   const handleSearch = (e: React.FormEvent) => {
