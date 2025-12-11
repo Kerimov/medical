@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { resolvePatientId } from '@/lib/caretaker-access'
 
 // Использует headers, помечаем маршрут как динамический
 export const dynamic = 'force-dynamic'
@@ -19,8 +20,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const patientIdParam = searchParams.get('patientId')
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_read' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const reminders = await prisma.reminder.findMany({
-      where: { userId: decoded.userId },
+      where: { userId: resolved.patientId },
       include: {
         analysis: true,
         document: true,
@@ -51,6 +57,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
+      patientId,
       title,
       description,
       dueAt,
@@ -65,9 +72,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Заголовок и дата обязательны' }, { status: 400 })
     }
 
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'reminders_write' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const reminder = await prisma.reminder.create({
       data: {
-        userId: decoded.userId,
+        userId: resolved.patientId,
         title,
         description,
         dueAt: new Date(dueAt),

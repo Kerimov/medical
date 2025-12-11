@@ -55,3 +55,57 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 })
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization')
+    let token: string | undefined
+    if (authHeader && authHeader.startsWith('Bearer ')) token = authHeader.substring(7)
+    else {
+      const cookieHeader = request.headers.get('cookie')
+      const cookies = cookieHeader ? parseCookies(cookieHeader) : {}
+      if (cookies.token) token = cookies.token
+    }
+
+    if (!token) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+
+    const decoded = verifyToken(token)
+    if (!decoded?.userId) return NextResponse.json({ error: 'Неверный токен' }, { status: 401 })
+
+    const doctor = await prisma.doctorProfile.findUnique({ where: { userId: decoded.userId } })
+    if (!doctor) return NextResponse.json({ error: 'Профиль врача не найден' }, { status: 403 })
+
+    const body = await request.json().catch(() => ({}))
+    const patientId = typeof body?.patientId === 'string' ? body.patientId : ''
+    if (!patientId) return NextResponse.json({ error: 'patientId обязателен' }, { status: 400 })
+
+    const patient = await prisma.user.findUnique({ where: { id: patientId }, select: { id: true, name: true, email: true, role: true } })
+    if (!patient) return NextResponse.json({ error: 'Пациент не найден' }, { status: 404 })
+
+    const recordType = typeof body?.recordType === 'string' ? body.recordType : 'consultation'
+    const diagnosis = typeof body?.diagnosis === 'string' && body.diagnosis.trim() ? body.diagnosis.trim() : null
+    const symptoms = typeof body?.symptoms === 'string' && body.symptoms.trim() ? body.symptoms.trim() : null
+    const treatment = typeof body?.treatment === 'string' && body.treatment.trim() ? body.treatment.trim() : null
+    const meds = Array.isArray(body?.medications) ? body.medications : null
+    const nextVisit = body?.nextVisit ? new Date(body.nextVisit) : null
+
+    const rec = await prisma.patientRecord.create({
+      data: {
+        doctorId: doctor.id,
+        patientId: patient.id,
+        recordType,
+        diagnosis,
+        symptoms,
+        treatment,
+        medications: meds && meds.length ? meds : null,
+        nextVisit,
+        status: 'active'
+      }
+    })
+
+    return NextResponse.json({ patientRecord: rec }, { status: 201 })
+  } catch (e) {
+    console.error('Error creating patient record:', e)
+    return NextResponse.json({ error: 'Ошибка при создании записи о пациенте' }, { status: 500 })
+  }
+}

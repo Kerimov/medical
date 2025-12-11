@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
+import { CaretakerPatientSwitcher } from '@/components/CaretakerPatientSwitcher'
 import { 
   Bell, 
   Plus, 
@@ -44,6 +45,7 @@ export default function RemindersPage() {
   const router = useRouter()
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loading, setLoading] = useState(true)
+  const [patientId, setPatientId] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newReminder, setNewReminder] = useState({
     title: '',
@@ -60,16 +62,30 @@ export default function RemindersPage() {
   }, [user, isLoading, router])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('caretakerPatientId')
+    if (stored) setPatientId(stored)
+  }, [])
+
+  function setPatientAndPersist(id: string | null) {
+    setPatientId(id)
+    if (typeof window === 'undefined') return
+    if (id) window.localStorage.setItem('caretakerPatientId', id)
+    else window.localStorage.removeItem('caretakerPatientId')
+  }
+
+  useEffect(() => {
     if (user && token) {
       fetchReminders()
     }
-  }, [user, token])
+  }, [user, token, patientId])
 
   const fetchReminders = async () => {
     try {
       if (!token) return
 
-      const response = await fetch('/api/reminders', {
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const response = await fetch(`/api/reminders${qs}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
 
@@ -96,7 +112,8 @@ export default function RemindersPage() {
       if (!token) return
 
       // Удаляем напоминание при выполнении (так как в схеме нет поля isCompleted)
-      const response = await fetch(`/api/reminders/${reminderId}`, {
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const response = await fetch(`/api/reminders/${reminderId}${qs}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -115,7 +132,8 @@ export default function RemindersPage() {
     try {
       if (!token) return
 
-      const response = await fetch(`/api/reminders/${reminderId}`, {
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const response = await fetch(`/api/reminders/${reminderId}${qs}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -143,7 +161,7 @@ export default function RemindersPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(newReminder)
+        body: JSON.stringify({ ...newReminder, patientId })
       })
 
       if (response.ok) {
@@ -206,6 +224,9 @@ export default function RemindersPage() {
 
   return (
     <div className="container mx-auto py-8">
+      <div className="mb-4">
+        <CaretakerPatientSwitcher selectedPatientId={patientId} onChange={setPatientAndPersist} />
+      </div>
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">Напоминания</h1>

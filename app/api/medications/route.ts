@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import { resolvePatientId } from '@/lib/caretaker-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +16,13 @@ export async function GET(req: NextRequest) {
     const decoded = verifyToken(token)
     if (!decoded?.userId) return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
 
+    const { searchParams } = new URL(req.url)
+    const patientIdParam = searchParams.get('patientId')
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_read' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const list = await prisma.patientMedication.findMany({
-      where: { userId: decoded.userId },
+      where: { userId: resolved.patientId },
       orderBy: { createdAt: 'desc' }
     })
     return NextResponse.json({ medications: list })
@@ -34,6 +40,10 @@ export async function POST(req: NextRequest) {
     if (!decoded?.userId) return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
 
     const body = await req.json().catch(() => ({}))
+    const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     if (!name) return NextResponse.json({ error: 'name обязателен' }, { status: 400 })
 
@@ -46,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     const created = await prisma.patientMedication.create({
       data: {
-        userId: decoded.userId,
+        userId: resolved.patientId,
         name,
         dosage: typeof body?.dosage === 'string' ? body.dosage : null,
         form: typeof body?.form === 'string' ? body.form : null,

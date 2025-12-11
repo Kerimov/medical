@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Pill, ShieldAlert, Clock, Plus, Trash2, Sparkles, Bell } from 'lucide-react'
+import { CaretakerPatientSwitcher } from '@/components/CaretakerPatientSwitcher'
 
 type Medication = {
   id: string
@@ -29,6 +30,7 @@ export default function MedicationsPage() {
   const [loading, setLoading] = useState(true)
   const [meds, setMeds] = useState<Medication[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [patientId, setPatientId] = useState<string | null>(null)
 
   const [form, setForm] = useState<any>({
     name: '',
@@ -47,12 +49,26 @@ export default function MedicationsPage() {
     if (!isLoading && !user) router.push('/login')
   }, [user, isLoading, router])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('caretakerPatientId')
+    if (stored) setPatientId(stored)
+  }, [])
+
+  function setPatientAndPersist(id: string | null) {
+    setPatientId(id)
+    if (typeof window === 'undefined') return
+    if (id) window.localStorage.setItem('caretakerPatientId', id)
+    else window.localStorage.removeItem('caretakerPatientId')
+  }
+
   async function fetchMeds() {
     if (!token) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/medications', { headers: { Authorization: `Bearer ${token}` } })
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const res = await fetch(`/api/medications${qs}`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Ошибка')
       setMeds(Array.isArray(data?.medications) ? data.medications : [])
@@ -66,7 +82,7 @@ export default function MedicationsPage() {
   useEffect(() => {
     if (user && token) fetchMeds()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, token])
+  }, [user, token, patientId])
 
   async function createMedication() {
     if (!token) return
@@ -76,6 +92,7 @@ export default function MedicationsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          patientId,
           name: form.name,
           dosage: form.dosage || null,
           frequencyPerDay: Number(form.frequencyPerDay) || 1,
@@ -97,7 +114,8 @@ export default function MedicationsPage() {
     if (!token) return
     if (!confirm('Удалить препарат?')) return
     try {
-      const res = await fetch(`/api/medications/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+      const res = await fetch(`/api/medications/${id}${qs}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Ошибка удаления')
       setMeds((prev) => prev.filter((m) => m.id !== id))
@@ -116,6 +134,7 @@ export default function MedicationsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          patientId,
           createReminders: true,
           channels: ['PUSH']
         })
@@ -154,6 +173,7 @@ export default function MedicationsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="container mx-auto py-8 space-y-6">
+        <CaretakerPatientSwitcher selectedPatientId={patientId} onChange={setPatientAndPersist} />
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Лекарства</h1>

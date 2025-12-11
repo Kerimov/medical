@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import { resolvePatientId } from '@/lib/caretaker-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,11 +75,15 @@ export async function POST(request: NextRequest) {
     if (!decoded?.userId) return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
 
     const body = await request.json().catch(() => ({}))
+    const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_read' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const createReminders = body?.createReminders !== false
     const channels = Array.isArray(body?.channels) ? body.channels : ['PUSH']
 
     const meds = await prisma.patientMedication.findMany({
-      where: { userId: decoded.userId },
+      where: { userId: resolved.patientId },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
               const marker = `[MED:${s.medicationId}][TIME:${time}]`
               const existing = await prisma.reminder.findFirst({
                 where: {
-                  userId: decoded.userId,
+                  userId: resolved.patientId,
                   recurrence: 'DAILY',
                   title: `Приём: ${s.name} (${time})`,
                   description: { contains: marker }
@@ -167,7 +172,7 @@ export async function POST(request: NextRequest) {
               if (existing) continue
               const reminder = await prisma.reminder.create({
                 data: {
-                  userId: decoded.userId,
+                  userId: resolved.patientId,
                   title: `Приём: ${s.name} (${time})`,
                   description: `${marker}\n${s.note || ''}`.trim(),
                   dueAt: nextDueAt(time),
@@ -208,7 +213,7 @@ export async function POST(request: NextRequest) {
           const marker = `[MED:${s.medicationId}][TIME:${time}]`
           const existing = await prisma.reminder.findFirst({
             where: {
-              userId: decoded.userId,
+              userId: resolved.patientId,
               recurrence: 'DAILY',
               title: `Приём: ${s.name} (${time})`,
               description: { contains: marker }
@@ -217,7 +222,7 @@ export async function POST(request: NextRequest) {
           if (existing) continue
           const reminder = await prisma.reminder.create({
             data: {
-              userId: decoded.userId,
+              userId: resolved.patientId,
               title: `Приём: ${s.name} (${time})`,
               description: `${marker}\n${s.note || ''}`.trim(),
               dueAt: nextDueAt(time),

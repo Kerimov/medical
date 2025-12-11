@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CaretakerPatientSwitcher } from '@/components/CaretakerPatientSwitcher'
 
 type Entry = {
   id: string
@@ -86,12 +87,28 @@ export default function DiaryPage() {
   const [indicatorUsedLLM, setIndicatorUsedLLM] = useState<boolean | null>(null)
   const [indicatorResult, setIndicatorResult] = useState<IndicatorLinkResult | null>(null)
 
+  const [patientId, setPatientId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('caretakerPatientId')
+    if (stored) setPatientId(stored)
+  }, [])
+
+  function setPatientAndPersist(id: string | null) {
+    setPatientId(id)
+    if (typeof window === 'undefined') return
+    if (id) window.localStorage.setItem('caretakerPatientId', id)
+    else window.localStorage.removeItem('caretakerPatientId')
+  }
+
   const uniqueTags = useMemo(() => Array.from(new Set(entries.flatMap(e => e.tags.map(t => t.tag.name)))), [entries])
 
   async function fetchEntries() {
     if (!token) return
     setLoading(true)
     const params = new URLSearchParams()
+    if (patientId) params.set('patientId', patientId)
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     if (tag) params.set('tag', tag)
@@ -102,7 +119,7 @@ export default function DiaryPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchEntries() }, [token])
+  useEffect(() => { fetchEntries() }, [token, patientId])
 
   useEffect(() => {
     if (!token) return
@@ -127,7 +144,7 @@ export default function DiaryPage() {
 
   async function createEntry() {
     if (!token) return
-    const payload = { ...form, tags: form.tags?.split(',').map((s: string) => s.trim()).filter(Boolean) }
+    const payload = { ...form, patientId, tags: form.tags?.split(',').map((s: string) => s.trim()).filter(Boolean) }
     const res = await fetch('/api/diary/entries', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) })
     if (res.ok) {
       setForm({ entryDate: new Date().toISOString().slice(0,16), mood: 3, painScore: 0, sleepHours: 8 })
@@ -139,7 +156,8 @@ export default function DiaryPage() {
     if (!token) return
     const ok = window.confirm('Удалить запись?')
     if (!ok) return
-    const res = await fetch(`/api/diary/entries/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    const qs = patientId ? `?patientId=${encodeURIComponent(patientId)}` : ''
+    const res = await fetch(`/api/diary/entries/${id}${qs}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     if (res.ok) {
       setEntries(prev => prev.filter(e => e.id !== id))
     }
@@ -208,6 +226,7 @@ export default function DiaryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
       <div className="container mx-auto p-6 space-y-6">
+        <CaretakerPatientSwitcher selectedPatientId={patientId} onChange={setPatientAndPersist} />
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Дневник здоровья</h1>
           <Button variant="outline" onClick={() => router.back()}>Назад</Button>

@@ -12,6 +12,7 @@ enum UserRole {
   PATIENT
   DOCTOR
   ADMIN
+  CARETAKER
 }
 
 enum Sex {
@@ -39,6 +40,24 @@ model User {
   patientProfile     PatientProfile?
   carePlanTasks      CarePlanTask[]
   preVisitQuestionnaires PreVisitQuestionnaire[]
+  caretakerLinks     CareRelationship[] @relation("CaretakerLinks")
+  patientCaretakers  CareRelationship[] @relation("PatientCaretakers")
+}
+
+model CareRelationship {
+  id          String   @id @default(cuid())
+  caretakerId String
+  caretaker   User     @relation("CaretakerLinks", fields: [caretakerId], references: [id], onDelete: Cascade)
+  patientId   String
+  patient     User     @relation("PatientCaretakers", fields: [patientId], references: [id], onDelete: Cascade)
+
+  // permissions: { diary: { read:true, write:true }, medications: {...}, reminders: {...} }
+  permissions Json
+  createdAt   DateTime @default(now())
+
+  @@unique([caretakerId, patientId])
+  @@index([caretakerId])
+  @@index([patientId])
 }
 
 enum CarePlanTaskStatus {

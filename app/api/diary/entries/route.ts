@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
+import { resolvePatientId } from '@/lib/caretaker-access'
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
@@ -10,12 +11,16 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
+  const patientIdParam = searchParams.get('patientId')
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const tag = searchParams.get('tag')
   const order = (searchParams.get('order') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'
 
-  const where: any = { userId: user.userId }
+  const resolved = await resolvePatientId({ payload: user, requestedPatientId: patientIdParam, capability: 'diary_read' })
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
+  const where: any = { userId: resolved.patientId }
   if (from || to) where.entryDate = {
     gte: from ? new Date(from) : undefined,
     lte: to ? new Date(to) : undefined
@@ -38,19 +43,22 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { entryDate, mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes, tags } = body
+  const { patientId, entryDate, mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes, tags } = body
+
+  const resolved = await resolvePatientId({ payload: user, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'diary_write' })
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
 
   const entry = await prisma.healthDiaryEntry.create({
     data: {
-      userId: user.userId,
+      userId: resolved.patientId,
       entryDate: entryDate ? new Date(entryDate) : new Date(),
       mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes,
       tags: tags?.length ? {
         create: tags.map((name: string) => ({
           tag: {
             connectOrCreate: {
-              where: { userId_name: { userId: user.userId, name } },
-              create: { userId: user.userId, name }
+              where: { userId_name: { userId: resolved.patientId, name } },
+              create: { userId: resolved.patientId, name }
             }
           }
         }))

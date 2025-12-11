@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { resolvePatientId } from '@/lib/caretaker-access'
 
 // Использует headers, помечаем маршрут как динамический
 export const dynamic = 'force-dynamic'
@@ -22,10 +23,15 @@ export async function GET(
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const patientIdParam = searchParams.get('patientId')
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_read' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     const reminder = await prisma.reminder.findFirst({
       where: { 
         id: params.id,
-        userId: decoded.userId 
+        userId: resolved.patientId 
       },
       include: {
         analysis: true,
@@ -63,6 +69,7 @@ export async function PUT(
 
     const body = await request.json()
     const {
+      patientId,
       title,
       description,
       dueAt,
@@ -70,11 +77,14 @@ export async function PUT(
       channels
     } = body
 
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'reminders_write' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     // Проверяем, что напоминание принадлежит пользователю
     const existingReminder = await prisma.reminder.findFirst({
       where: { 
         id: params.id,
-        userId: decoded.userId 
+        userId: resolved.patientId 
       }
     })
 
@@ -117,11 +127,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const patientIdParam = searchParams.get('patientId')
+    const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_write' })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+
     // Проверяем, что напоминание принадлежит пользователю
     const existingReminder = await prisma.reminder.findFirst({
       where: { 
         id: params.id,
-        userId: decoded.userId 
+        userId: resolved.patientId 
       }
     })
 
