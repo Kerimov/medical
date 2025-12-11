@@ -62,6 +62,7 @@ export default function CompaniesPage() {
   const [locationDetected, setLocationDetected] = useState(false)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [userCoordinates, setUserCoordinates] = useState<{ lat: number; lng: number } | null>(null)
+  const [detectedCity, setDetectedCity] = useState<string | null>(null)
 
   const fetchCompanies = async () => {
     try {
@@ -202,17 +203,20 @@ export default function CompaniesPage() {
                   if (finalCity) {
                     console.log('✅ Найден совпадающий город:', finalCity)
                     setCityFilter(finalCity)
+                    setDetectedCity(finalCity)
                     setLocationDetected(true)
                   } else {
                     console.log('⚠️ Город не найден в списке, используем:', city)
                     // Используем определенный город, даже если его нет в списке
                     // API будет искать по contains, так что это должно работать
                     setCityFilter(city)
+                    setDetectedCity(city)
                     setLocationDetected(true)
                   }
                 } else {
                   console.log('⚠️ Город не определен из геокодирования')
                   // Даже если город не определен, используем координаты для сортировки
+                  setDetectedCity('Координаты определены')
                   setLocationDetected(true)
                 }
                 
@@ -221,6 +225,7 @@ export default function CompaniesPage() {
               } catch (geocodeError) {
                 console.error('❌ Ошибка геокодирования:', geocodeError)
                 // Даже если геокодирование не удалось, используем координаты для сортировки
+                setDetectedCity('Координаты определены')
                 setLocationDetected(true)
                 setUserCoordinates({ lat: latitude, lng: longitude })
                 await fetchCompanies()
@@ -347,6 +352,7 @@ export default function CompaniesPage() {
         
         const cityToUse = finalCity || data.city
         setCityFilter(cityToUse)
+        setDetectedCity(cityToUse)
         setLocationDetected(true)
         if (data.coordinates) {
           setUserCoordinates(data.coordinates)
@@ -402,18 +408,40 @@ export default function CompaniesPage() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Найдите проверенные клиники, лаборатории, аптеки и магазины здорового питания в вашем городе
           </p>
-          {locationDetected && cityFilter && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg shadow-sm">
-              <MapPin className="w-5 h-5 text-green-600" />
-              <div>
-                <span className="text-sm text-gray-600">Ваше местоположение: </span>
-                <span className="text-sm font-semibold text-green-700">{cityFilter}</span>
-                {userCoordinates && (
-                  <span className="ml-2 text-xs text-gray-500">
-                    ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
-                  </span>
-                )}
+          {locationDetected && (detectedCity || userCoordinates) && (
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-xl shadow-lg mb-4">
+              <div className="flex items-center justify-center w-10 h-10 bg-green-500 rounded-full shadow-md">
+                <MapPin className="w-6 h-6 text-white" />
               </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Ваше местоположение</span>
+                <div className="flex items-center gap-2">
+                  {detectedCity && (
+                    <span className="text-lg font-bold text-green-700">{detectedCity}</span>
+                  )}
+                  {userCoordinates && (
+                    <span className="text-sm text-gray-600 font-mono">
+                      ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCityFilter('')
+                  setLocationDetected(false)
+                  setDetectedCity(null)
+                  setUserCoordinates(null)
+                  fetchCompanies()
+                }}
+                className="ml-4 text-xs h-auto p-1 text-gray-500 hover:text-red-600 hover:bg-red-50"
+                title="Сбросить определенное местоположение"
+              >
+                ✕
+              </Button>
             </div>
           )}
         </div>
@@ -490,7 +518,7 @@ export default function CompaniesPage() {
                     )}
                   </Button>
                 </div>
-                {locationDetected && cityFilter && (
+                {locationDetected && (detectedCity || userCoordinates) && (
                   <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
@@ -501,10 +529,14 @@ export default function CompaniesPage() {
                           Местоположение определено
                         </div>
                         <div className="text-xs text-green-600">
-                          Город: <span className="font-semibold">{cityFilter}</span>
+                          {detectedCity && (
+                            <>
+                              Город: <span className="font-semibold">{detectedCity}</span>
+                            </>
+                          )}
                           {userCoordinates && (
-                            <span className="ml-2 text-gray-500">
-                              ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
+                            <span className={detectedCity ? "ml-2 text-gray-500" : ""}>
+                              Координаты: ({userCoordinates.lat.toFixed(4)}, {userCoordinates.lng.toFixed(4)})
                             </span>
                           )}
                         </div>
@@ -515,8 +547,9 @@ export default function CompaniesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setCityFilter('all')
+                        setCityFilter('')
                         setLocationDetected(false)
+                        setDetectedCity(null)
                         setUserCoordinates(null)
                         fetchCompanies()
                       }}
