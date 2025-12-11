@@ -423,13 +423,15 @@ export default function MarketplacePage() {
                     <div className="flex gap-2">
                       {recommendation.status === 'ACTIVE' && (
                         <>
-                          <Button 
-                            size="sm" 
-                            className="gradient-primary text-white hover:opacity-90"
-                            onClick={() => handleRecommendationAction(recommendation.id, 'view')}
-                          >
-                            Подробнее
-                          </Button>
+                          <Link href={`/marketplace/recommendations/${recommendation.id}`}>
+                            <Button 
+                              size="sm" 
+                              className="gradient-primary text-white hover:opacity-90"
+                              onClick={() => handleRecommendationAction(recommendation.id, 'view')}
+                            >
+                              Подробнее
+                            </Button>
+                          </Link>
                           <Button 
                             size="sm" 
                             variant="outline"
