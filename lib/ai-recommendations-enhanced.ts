@@ -86,11 +86,18 @@ async function findNearbyCompanies(
 
 // Анализ показателей здоровья пользователя
 export async function analyzeUserHealth(userId: string) {
+  logger.info(`Analyzing health for user ${userId}`, 'recommendations')
+  
   // Получаем последние анализы пользователя
   const recentAnalyses = await prisma.analysis.findMany({
     where: { userId },
     orderBy: { date: 'desc' },
     take: 5
+  })
+
+  logger.info(`Found ${recentAnalyses.length} recent analyses`, 'recommendations')
+  recentAnalyses.forEach((a, i) => {
+    logger.info(`Analysis ${i + 1}: ${a.title}, status: ${a.status}, type: ${a.type}`, 'recommendations')
   })
 
   // Получаем все документы с распознанными показателями
@@ -104,6 +111,8 @@ export async function analyzeUserHealth(userId: string) {
     take: 10
   })
 
+  logger.info(`Found ${documents.length} parsed documents with indicators`, 'recommendations')
+
   const healthIssues: string[] = []
   const abnormalIndicators: any[] = []
 
@@ -111,8 +120,12 @@ export async function analyzeUserHealth(userId: string) {
   for (const doc of documents) {
     if (doc.indicators && typeof doc.indicators === 'object') {
       const indicators = doc.indicators as any[]
+      logger.info(`Document ${doc.id}: processing ${indicators.length} indicators`, 'recommendations')
       
       for (const indicator of indicators) {
+        const isAbnormal = !indicator.isNormal
+        logger.info(`Indicator: ${indicator.name}, value: ${indicator.value}, isNormal: ${indicator.isNormal}, isAbnormal: ${isAbnormal}`, 'recommendations')
+        
         if (!indicator.isNormal) {
           abnormalIndicators.push({
             ...indicator,
@@ -122,25 +135,32 @@ export async function analyzeUserHealth(userId: string) {
 
           // Определяем тип проблемы
           const name = indicator.name.toLowerCase()
+          logger.info(`Processing abnormal indicator: ${name}`, 'recommendations')
+          
           if (name.includes('витамин d') || name.includes('25-oh')) {
             if (indicator.value < indicator.referenceMin) {
               healthIssues.push('vitamin_d_deficiency')
+              logger.info(`Found vitamin D deficiency`, 'recommendations')
             }
           } else if (name.includes('холестерин') || name.includes('cholesterol')) {
             if (indicator.value > indicator.referenceMax) {
               healthIssues.push('high_cholesterol')
+              logger.info(`Found high cholesterol`, 'recommendations')
             }
           } else if (name.includes('глюкоз') || name.includes('glucose')) {
             if (indicator.value > indicator.referenceMax) {
               healthIssues.push('high_glucose')
+              logger.info(`Found high glucose`, 'recommendations')
             }
           } else if (name.includes('гемоглобин') || name.includes('hemoglobin')) {
             if (indicator.value < indicator.referenceMin) {
               healthIssues.push('low_hemoglobin')
+              logger.info(`Found low hemoglobin`, 'recommendations')
             }
           } else if (name.includes('железо') || name.includes('ferritin')) {
             if (indicator.value < indicator.referenceMin) {
               healthIssues.push('iron_deficiency')
+              logger.info(`Found iron deficiency`, 'recommendations')
             }
           }
         }
@@ -151,8 +171,14 @@ export async function analyzeUserHealth(userId: string) {
   // Анализируем показатели из таблицы Analysis (если есть структурированные results)
   for (const analysis of recentAnalyses) {
     try {
+      logger.info(`Processing analysis ${analysis.id}: ${analysis.title}`, 'recommendations')
       const parsed = typeof analysis.results === 'string' ? JSON.parse(analysis.results as unknown as string) : analysis.results
-      if (!parsed) continue
+      if (!parsed) {
+        logger.info(`Analysis ${analysis.id}: results is empty or invalid`, 'recommendations')
+        continue
+      }
+
+      logger.info(`Analysis ${analysis.id}: parsed results structure: ${Array.isArray(parsed) ? 'array' : typeof parsed}`, 'recommendations')
 
       const pushFromIndicator = (nameRaw: any, v: any) => {
         const name = (nameRaw || '').toString().toLowerCase()
@@ -165,8 +191,12 @@ export async function analyzeUserHealth(userId: string) {
           referenceMax: v?.referenceMax ?? v?.max ?? v?.ReferenceMax ?? NaN,
           isNormal: Boolean(isNormal)
         }
+        
+        logger.info(`Indicator from analysis: ${indicator.name}, value: ${indicator.value}, isNormal: ${indicator.isNormal}`, 'recommendations')
+        
         if (indicator.isNormal === false) {
           abnormalIndicators.push({ ...indicator, analysisId: analysis.id, analysisDate: analysis.date })
+          logger.info(`Added abnormal indicator: ${indicator.name}`, 'recommendations')
 
           if (name.includes('витамин d') || name.includes('25-oh')) {
             healthIssues.push('vitamin_d_deficiency')
@@ -182,21 +212,39 @@ export async function analyzeUserHealth(userId: string) {
         }
       }
 
-      if (Array.isArray(parsed)) {
+      // Проверяем структуру parsed.indicators
+      if (parsed.indicators && Array.isArray(parsed.indicators)) {
+        logger.info(`Analysis ${analysis.id}: found ${parsed.indicators.length} indicators in parsed.indicators`, 'recommendations')
+        for (const item of parsed.indicators) {
+          const name = item?.name ?? item?.Name
+          if (name !== undefined) pushFromIndicator(name, item)
+        }
+      } else if (Array.isArray(parsed)) {
+        logger.info(`Analysis ${analysis.id}: results is array with ${parsed.length} items`, 'recommendations')
         for (const item of parsed) {
           const name = item?.name ?? item?.Name
           if (name !== undefined) pushFromIndicator(name, item)
         }
       } else if (typeof parsed === 'object') {
+        logger.info(`Analysis ${analysis.id}: results is object with ${Object.keys(parsed).length} keys`, 'recommendations')
         const entries = Object.entries(parsed as Record<string, any>)
         for (const [nameRaw, v] of entries) {
           pushFromIndicator(nameRaw, v)
         }
       }
-    } catch {
+    } catch (err) {
+      logger.error(`Error processing analysis ${analysis.id}:`, err)
       // игнорируем неструктурированные results
     }
   }
+
+  logger.info(`Health analysis complete:`, 'recommendations', {
+    healthIssues: healthIssues.length,
+    uniqueHealthIssues: [...new Set(healthIssues)],
+    abnormalIndicators: abnormalIndicators.length,
+    recentAnalyses: recentAnalyses.length,
+    documents: documents.length
+  })
 
   return {
     healthIssues: [...new Set(healthIssues)], // Убираем дубликаты
@@ -458,17 +506,30 @@ export async function createEnhancedRecommendationsForUser(
 
     // Fallback: если есть анализы со статусом abnormal, но не удалось разобрать показатели — создаем базовые рекомендации
     if (recommendations.length === 0) {
-      const abnormalAnalyses = (recentAnalyses || []).filter(a => (a as any)?.status === 'abnormal')
+      logger.info(`No specific recommendations created yet, checking fallback options`, 'recommendations')
+      
+      const allAnalysesStatuses = recentAnalyses.map(a => a.status)
+      logger.info(`All analysis statuses: ${allAnalysesStatuses.join(', ')}`, 'recommendations')
+      
+      const abnormalAnalyses = (recentAnalyses || []).filter(a => a.status === 'abnormal')
       
       logger.info(`No specific health issues found, checking abnormal analyses: ${abnormalAnalyses.length}`, 'recommendations')
+      logger.info(`Abnormal analyses details:`, 'recommendations', abnormalAnalyses.map(a => ({ id: a.id, title: a.title, status: a.status })))
       
       if (abnormalAnalyses.length > 0) {
+        logger.info(`Trying to find companies for recommendations`, 'recommendations')
         const [labs, clinics] = await Promise.all([
           findNearbyCompanies('LABORATORY', userLocation, 2),
           findNearbyCompanies('CLINIC', userLocation, 1)
         ])
 
         logger.info(`Found companies: labs=${labs.length}, clinics=${clinics.length}`, 'recommendations')
+        
+        if (labs.length === 0 && clinics.length === 0) {
+          logger.error(`❌ No companies found in database! Recommendations cannot be created without companies.`, 'recommendations')
+          logger.error(`Please run: node prisma/seed-companies.js to populate companies`, 'recommendations')
+          throw new Error('No companies found in database. Please seed companies first using: node prisma/seed-companies.js')
+        }
 
         for (const a of abnormalAnalyses.slice(0, 2)) {
           if (labs.length > 0) {
@@ -505,6 +566,8 @@ export async function createEnhancedRecommendationsForUser(
           findNearbyCompanies('LABORATORY', userLocation, 1),
           findNearbyCompanies('CLINIC', userLocation, 1)
         ])
+
+        logger.info(`General recommendations: found labs=${labs.length}, clinics=${clinics.length}`, 'recommendations')
 
         if (labs.length > 0) {
           recommendations.push({
