@@ -37,6 +37,20 @@ model User {
   diaryTags         DiaryTag[]
   patientMedications PatientMedication[]
   patientProfile     PatientProfile?
+  carePlanTasks      CarePlanTask[]
+}
+
+enum CarePlanTaskStatus {
+  ACTIVE
+  SNOOZED
+  COMPLETED
+}
+
+enum CarePlanCheckInType {
+  COMPLETE
+  SNOOZE
+  REOPEN
+  NOTE
 }
 
 /// Профиль пациента (минимум, который усиливает все AI-функции)
@@ -194,6 +208,7 @@ model Document {
   indicators    Json?
   analyses      Analysis[]
   reminders     Reminder[]
+  carePlanTasks CarePlanTask[]
 }
 
 model Analysis {
@@ -215,6 +230,7 @@ model Analysis {
   updatedAt   DateTime @updatedAt
   reminders   Reminder[]
   recommendations Recommendation[]
+  carePlanTasks CarePlanTask[]
 }
 
 /// Напоминания и планирование
@@ -277,6 +293,45 @@ model ReminderDelivery {
   sentAt     DateTime?
   error      String?
   createdAt  DateTime        @default(now())
+}
+
+model CarePlanTask {
+  id           String             @id @default(cuid())
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  analysisId   String?
+  analysis     Analysis?          @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  documentId   String?
+  document     Document?          @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  title        String
+  description  String?
+  status       CarePlanTaskStatus @default(ACTIVE)
+  dueAt        DateTime?
+  recurrence   ReminderRecurrence @default(NONE)
+  channels     Json?
+  reminderId   String?
+  snoozedUntil DateTime?
+
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  checkIns     CarePlanCheckIn[]
+
+  @@index([userId, status])
+  @@index([analysisId])
+  @@index([documentId])
+}
+
+model CarePlanCheckIn {
+  id        String             @id @default(cuid())
+  taskId    String
+  task      CarePlanTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type      CarePlanCheckInType
+  reason    String?
+  createdAt DateTime           @default(now())
+
+  @@index([taskId, createdAt])
 }
 
 /// Маркетплейс и персонализированные предложения

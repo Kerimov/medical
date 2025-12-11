@@ -207,7 +207,8 @@ ${JSON.stringify(indicators, null, 2)}
     }
 
     const now = Date.now()
-    const created: any[] = []
+    const createdReminders: any[] = []
+    const createdTasks: any[] = []
     for (const t of tasks.slice(0, 7)) {
       const title = String(t?.title || '').trim()
       if (!title) continue
@@ -217,6 +218,21 @@ ${JSON.stringify(indicators, null, 2)}
       const recurrence = normalizeRecurrence(String(t?.recurrence || 'NONE'))
       const channels = normalizeChannels(t?.channels)
 
+      // 1) создаём задачу плана действий (timeline)
+      const task = await prisma.carePlanTask.create({
+        data: {
+          userId: payload.userId,
+          analysisId: analysis.id,
+          title,
+          description,
+          dueAt,
+          recurrence,
+          channels
+        }
+      })
+      createdTasks.push(task)
+
+      // 2) MVP: продолжаем создавать напоминания, чтобы не сломать существующий UX
       const reminder = await prisma.reminder.create({
         data: {
           userId: payload.userId,
@@ -228,12 +244,19 @@ ${JSON.stringify(indicators, null, 2)}
           channels
         }
       })
-      created.push(reminder)
+      createdReminders.push(reminder)
+
+      // 3) связываем задачу с reminder (не обязательное поле, но полезно)
+      await prisma.carePlanTask.update({
+        where: { id: task.id },
+        data: { reminderId: reminder.id }
+      }).catch(() => {})
     }
 
     return NextResponse.json({
-      message: `Создано ${created.length} напоминаний по плану действий`,
-      reminders: created,
+      message: `Создано задач: ${createdTasks.length}, напоминаний: ${createdReminders.length}`,
+      tasks: createdTasks,
+      reminders: createdReminders,
       plan: { tasks: tasks.slice(0, 7) }
     })
   } catch (error) {
