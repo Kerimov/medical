@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MessageCircle, Send, X, Bot, User, Loader2, Paperclip, FileText, XCircle } from 'lucide-react'
+import { MessageCircle, Send, X, Bot, User, Loader2, Paperclip, FileText, XCircle, Trash2 } from 'lucide-react'
 
 interface Message {
   id: string
@@ -157,6 +157,19 @@ export function AIChat() {
     }
   }
 
+  const clearChat = () => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: 'Здравствуйте! 👋 Я ваш персональный медицинский ассистент. Я могу помочь вам:\n\n• 📅 Записаться на прием к врачу\n• 📊 Показать результаты анализов\n• 💡 Дать персональные рекомендации\n• 👨‍⚕️ Найти подходящего врача\n• 📋 Показать ваши записи на приемы\n\nПросто скажите, что вам нужно!',
+        timestamp: new Date()
+      }
+    ])
+    setSelectedDocuments([])
+    setShowDocumentSelector(false)
+  }
+
   const getFunctionLabel = (functionName: string): string => {
     switch (functionName) {
       case 'book_appointment': return '📅 Запись на прием'
@@ -192,13 +205,25 @@ export function AIChat() {
             <CardDescription className="text-xs">Персональный медицинский помощник</CardDescription>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsOpen(false)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={clearChat}
+            title="Очистить чат"
+            className="h-8 w-8"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsOpen(false)}
+            title="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
