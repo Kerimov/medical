@@ -145,7 +145,7 @@ export default function DoctorDashboard() {
                   Новый пациент
                 </Button>
               </Link>
-              <Link href="/doctor/appointments/new">
+              <Link href="/doctor/appointments">
                 <Button className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300">
                   <CalendarPlus className="w-4 h-4 mr-2" />
                   Запись на прием

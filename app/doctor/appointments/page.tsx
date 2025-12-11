@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Calendar } from 'lucide-react'
+import { Calendar, CalendarPlus } from 'lucide-react'
 import Link from 'next/link'
 
 interface Appointment {
@@ -152,9 +152,26 @@ export default function DoctorAppointmentsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Приемы</h1>
-          <p className="text-muted-foreground">Всего: {appointments.length}</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Приемы</h1>
+            <p className="text-muted-foreground">Всего: {appointments.length}</p>
+          </div>
+          <Button 
+            onClick={() => {
+              const today = new Date().toISOString().split('T')[0]
+              const now = new Date()
+              const hours = now.getHours()
+              const minutes = Math.ceil(now.getMinutes() / 15) * 15
+              const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+              setFormState({ date: today, time: timeStr, patientId: '', type: 'consultation' })
+              setIsCreateOpen(true)
+            }}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+          >
+            <CalendarPlus className="w-4 h-4 mr-2" />
+            Создать запись
+          </Button>
         </div>
 
         <Card className="glass-effect border-0 shadow-medical">
