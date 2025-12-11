@@ -115,71 +115,176 @@ export default function CompaniesPage() {
   }, [])
 
   // Автоматическое определение местоположения
-  const detectLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Геолокация не поддерживается вашим браузером')
-      return
-    }
-
+  const detectLocation = async () => {
     setDetectingLocation(true)
     
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords
-          
-          // Используем обратное геокодирование для определения города
-          // Можно использовать бесплатный API или просто показать координаты
-          // Для простоты используем координаты для поиска ближайших компаний
-          
-          // Пробуем определить город через API (можно использовать бесплатный сервис)
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`)
-          const data = await response.json()
-          
-          const city = data.address?.city || data.address?.town || data.address?.village
-          
-          // Сохраняем координаты для сортировки по расстоянию
-          setUserCoordinates({ lat: latitude, lng: longitude })
-          
-          if (city) {
-            // Ищем похожий город в списке доступных
-            const matchedCity = availableCities.find(c => 
-              c.toLowerCase().includes(city.toLowerCase()) || 
-              city.toLowerCase().includes(c.toLowerCase())
-            )
-            
-            if (matchedCity) {
-              setCityFilter(matchedCity)
-              setLocationDetected(true)
-            } else {
-              setCityFilter(city)
-              setLocationDetected(true)
+    // Сначала пробуем через браузерную геолокацию
+    if (navigator.geolocation) {
+      try {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const { latitude, longitude } = position.coords
+              console.log('📍 Получены координаты:', latitude, longitude)
+              
+              // Сохраняем координаты для сортировки по расстоянию
+              setUserCoordinates({ lat: latitude, lng: longitude })
+              
+              // Пробуем определить город через наш API endpoint
+              try {
+                const response = await fetch('/api/marketplace/geolocation', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ lat: latitude, lng: longitude })
+                })
+                
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`)
+                }
+                
+                const data = await response.json()
+                console.log('🌍 Геокодирование ответ:', data)
+                
+                const city = data.city || data.rawCity
+                console.log('🏙️ Определен город:', city)
+                
+                if (city) {
+                  // Ищем похожий город в списке доступных
+                  const matchedCity = availableCities.find(c => {
+                    const cLower = c.toLowerCase()
+                    const cityLower = city.toLowerCase()
+                    return cLower === cityLower || 
+                           cLower.includes(cityLower) || 
+                           cityLower.includes(cLower) ||
+                           cLower.replace(/[-\s]/g, '') === cityLower.replace(/[-\s]/g, '')
+                  })
+                  
+                  if (matchedCity) {
+                    console.log('✅ Найден совпадающий город:', matchedCity)
+                    setCityFilter(matchedCity)
+                    setLocationDetected(true)
+                  } else {
+                    console.log('⚠️ Город не найден в списке, используем:', city)
+                    setCityFilter(city)
+                    setLocationDetected(true)
+                  }
+                } else {
+                  console.log('⚠️ Город не определен из геокодирования')
+                  // Даже если город не определен, используем координаты для сортировки
+                  setLocationDetected(true)
+                }
+                
+                // Обновляем список компаний с учетом координат
+                await fetchCompanies()
+              } catch (geocodeError) {
+                console.error('❌ Ошибка геокодирования:', geocodeError)
+                // Даже если геокодирование не удалось, используем координаты для сортировки
+                setLocationDetected(true)
+                setUserCoordinates({ lat: latitude, lng: longitude })
+                await fetchCompanies()
+              }
+            } catch (error) {
+              console.error('❌ Ошибка обработки местоположения:', error)
+              // Пробуем fallback через IP
+              const success = await tryIPGeolocation()
+              if (!success) {
+                alert('Не удалось автоматически определить город. Выберите город вручную из списка.')
+              }
             }
-          } else {
-            // Даже если город не определен, используем координаты для сортировки
-            setLocationDetected(true)
+          },
+          async (error) => {
+            console.error('❌ Ошибка геолокации:', error)
+            // Если браузерная геолокация не работает, пробуем через IP
+            const success = await tryIPGeolocation()
+            if (!success) {
+              let errorMessage = 'Не удалось определить местоположение. '
+              switch (error.code) {
+                case error.PERMISSION_DENIED:
+                  errorMessage += 'Разрешите доступ к геолокации в настройках браузера или выберите город вручную.'
+                  break
+                case error.POSITION_UNAVAILABLE:
+                  errorMessage += 'Местоположение недоступно. Выберите город вручную.'
+                  break
+                case error.TIMEOUT:
+                  errorMessage += 'Превышено время ожидания. Выберите город вручную.'
+                  break
+                default:
+                  errorMessage += 'Выберите город вручную.'
+                  break
+              }
+              alert(errorMessage)
+            }
+          },
+          {
+            enableHighAccuracy: false, // Ускоряем определение
+            timeout: 10000,
+            maximumAge: 300000 // 5 минут
           }
-          
-          // Обновляем список компаний с учетом координат
-          await fetchCompanies()
-        } catch (error) {
-          console.error('Error detecting location:', error)
-          alert('Ошибка определения местоположения')
-        } finally {
-          setDetectingLocation(false)
+        )
+      } catch (error) {
+        console.error('❌ Критическая ошибка геолокации:', error)
+        const success = await tryIPGeolocation()
+        if (!success) {
+          alert('Геолокация не поддерживается вашим браузером. Выберите город вручную из списка.')
         }
-      },
-      (error) => {
-        console.error('Geolocation error:', error)
-        alert('Не удалось определить местоположение. Разрешите доступ к геолокации или выберите город вручную.')
-        setDetectingLocation(false)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
       }
-    )
+    } else {
+      // Если браузерная геолокация не поддерживается, пробуем через IP
+      const success = await tryIPGeolocation()
+      if (!success) {
+        alert('Геолокация не поддерживается вашим браузером. Выберите город вручную из списка.')
+      }
+    }
+  }
+
+  // Fallback: определение города по IP
+  const tryIPGeolocation = async () => {
+    try {
+      console.log('🌐 Пробуем определить город по IP...')
+      const response = await fetch('/api/marketplace/geolocation/ip')
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('🌍 IP геолокация ответ:', data)
+        
+        if (data.city) {
+          const matchedCity = availableCities.find(c => {
+            const cLower = c.toLowerCase()
+            const cityLower = data.city.toLowerCase()
+            return cLower === cityLower || 
+                   cLower.includes(cityLower) || 
+                   cityLower.includes(cLower)
+          })
+          
+          if (matchedCity) {
+            setCityFilter(matchedCity)
+            setLocationDetected(true)
+            if (data.coordinates) {
+              setUserCoordinates(data.coordinates)
+            }
+            await fetchCompanies()
+            setDetectingLocation(false)
+            return true
+          } else if (data.city) {
+            setCityFilter(data.city)
+            setLocationDetected(true)
+            if (data.coordinates) {
+              setUserCoordinates(data.coordinates)
+            }
+            await fetchCompanies()
+            setDetectingLocation(false)
+            return true
+          }
+        }
+      }
+    } catch (ipError) {
+      console.error('❌ Ошибка IP геолокации:', ipError)
+    }
+    
+    setDetectingLocation(false)
+    return false
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -294,9 +399,31 @@ export default function CompaniesPage() {
                   </Button>
                 </div>
                 {locationDetected && cityFilter && (
-                  <div className="text-xs text-green-600 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    Определено автоматически: {cityFilter}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-green-600 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      Определено автоматически: {cityFilter}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setCityFilter('all')
+                        setLocationDetected(false)
+                        setUserCoordinates(null)
+                        fetchCompanies()
+                      }}
+                      className="text-xs h-auto p-1 text-gray-500 hover:text-gray-700"
+                    >
+                      ✕ Сбросить
+                    </Button>
+                  </div>
+                )}
+                {detectingLocation && (
+                  <div className="text-xs text-blue-600 flex items-center gap-1">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                    Определение местоположения...
                   </div>
                 )}
 
