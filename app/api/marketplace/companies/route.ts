@@ -40,11 +40,49 @@ export async function GET(request: NextRequest) {
       where.type = type
     }
 
-    if (city) {
-      where.city = {
-        contains: city,
-        mode: 'insensitive'
+    // Собираем все условия в массив для правильного объединения
+    const conditions: any[] = []
+
+    if (city && city !== 'all') {
+      // Нормализуем название города
+      const normalizeCityName = (name: string) => {
+        return name
+          .toLowerCase()
+          .replace(/^г\.?\s*/i, '')
+          .replace(/\s+город.*$/i, '')
+          .trim()
       }
+      
+      const normalizedCity = normalizeCityName(city)
+      
+      // Специальные случаи для городов с разными названиями
+      const cityMappings: Record<string, string[]> = {
+        'санкт-петербург': ['санкт-петербург', 'спб', 'петербург', 'ленинград'],
+        'москва': ['москва', 'мск'],
+        'нижний новгород': ['нижний новгород', 'нн', 'нижний'],
+        'ростов-на-дону': ['ростов-на-дону', 'ростов'],
+        'набережные челны': ['набережные челны', 'челны']
+      }
+      
+      const cityVariants = cityMappings[normalizedCity] || [normalizedCity]
+      
+      // Создаем условия для поиска по городу
+      const cityConditions = cityVariants.map(variant => ({
+        city: {
+          contains: variant,
+          mode: 'insensitive' as const
+        }
+      }))
+      
+      // Добавляем точное совпадение
+      cityConditions.push({
+        city: {
+          equals: city,
+          mode: 'insensitive' as const
+        }
+      })
+      
+      conditions.push({ OR: cityConditions })
     }
 
     if (verified === 'true') {
@@ -52,10 +90,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
+      conditions.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as const } },
+          { description: { contains: search, mode: 'insensitive' as const } }
+        ]
+      })
+    }
+
+    // Объединяем все условия через AND
+    if (conditions.length > 0) {
+      where.AND = conditions
     }
 
     const [companiesData, total] = await Promise.all([

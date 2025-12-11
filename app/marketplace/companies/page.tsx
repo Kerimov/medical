@@ -69,7 +69,7 @@ export default function CompaniesPage() {
       const params = new URLSearchParams()
 
       if (selectedType !== 'all') params.append('type', selectedType)
-      if (cityFilter) params.append('city', cityFilter)
+      if (cityFilter && cityFilter !== 'all') params.append('city', cityFilter)
       if (searchQuery) params.append('search', searchQuery)
       if (verifiedOnly) params.append('verified', 'true')
       if (userCoordinates) {
@@ -78,13 +78,17 @@ export default function CompaniesPage() {
       }
       params.append('limit', '20')
 
-      const response = await fetch(`/api/marketplace/companies?${params}`)
+      const url = `/api/marketplace/companies?${params}`
+      console.log('🔍 Запрос компаний:', url)
+      
+      const response = await fetch(url)
 
       if (!response.ok) {
         throw new Error('Ошибка загрузки компаний')
       }
 
       const data = await response.json()
+      console.log('📊 Получено компаний:', data.companies?.length || 0, 'из', data.total || 0)
       setCompanies(data.companies || [])
       setTotal(data.total || 0)
     } catch (error) {
@@ -151,22 +155,58 @@ export default function CompaniesPage() {
                 console.log('🏙️ Определен город:', city)
                 
                 if (city) {
+                  // Нормализуем название города для поиска
+                  const normalizeCityName = (name: string) => {
+                    return name
+                      .toLowerCase()
+                      .replace(/^г\.?\s*/i, '') // убираем "г." в начале
+                      .replace(/\s+город.*$/i, '') // убираем " город" в конце
+                      .replace(/[-\s]/g, '') // убираем дефисы и пробелы
+                      .trim()
+                  }
+                  
+                  const normalizedCity = normalizeCityName(city)
+                  
                   // Ищем похожий город в списке доступных
                   const matchedCity = availableCities.find(c => {
-                    const cLower = c.toLowerCase()
-                    const cityLower = city.toLowerCase()
-                    return cLower === cityLower || 
-                           cLower.includes(cityLower) || 
-                           cityLower.includes(cLower) ||
-                           cLower.replace(/[-\s]/g, '') === cityLower.replace(/[-\s]/g, '')
+                    const normalizedAvailable = normalizeCityName(c)
+                    return normalizedAvailable === normalizedCity ||
+                           normalizedAvailable.includes(normalizedCity) ||
+                           normalizedCity.includes(normalizedAvailable)
                   })
                   
-                  if (matchedCity) {
-                    console.log('✅ Найден совпадающий город:', matchedCity)
-                    setCityFilter(matchedCity)
+                  // Также проверяем специальные случаи (Санкт-Петербург = СПб = Петербург)
+                  const cityAliases: Record<string, string[]> = {
+                    'санкт-петербург': ['спб', 'петербург', 'ленинград'],
+                    'москва': ['мск'],
+                    'нижний новгород': ['нн', 'нижний'],
+                    'ростов-на-дону': ['ростов'],
+                    'набережные челны': ['челны']
+                  }
+                  
+                  let finalCity = matchedCity
+                  if (!finalCity && cityAliases[normalizedCity]) {
+                    const aliases = cityAliases[normalizedCity]
+                    for (const alias of aliases) {
+                      const found = availableCities.find(c => 
+                        normalizeCityName(c).includes(alias) || 
+                        alias.includes(normalizeCityName(c))
+                      )
+                      if (found) {
+                        finalCity = found
+                        break
+                      }
+                    }
+                  }
+                  
+                  if (finalCity) {
+                    console.log('✅ Найден совпадающий город:', finalCity)
+                    setCityFilter(finalCity)
                     setLocationDetected(true)
                   } else {
                     console.log('⚠️ Город не найден в списке, используем:', city)
+                    // Используем определенный город, даже если его нет в списке
+                    // API будет искать по contains, так что это должно работать
                     setCityFilter(city)
                     setLocationDetected(true)
                   }
@@ -250,33 +290,59 @@ export default function CompaniesPage() {
         console.log('🌍 IP геолокация ответ:', data)
         
         if (data.city) {
+          // Нормализуем название города
+          const normalizeCityName = (name: string) => {
+            return name
+              .toLowerCase()
+              .replace(/^г\.?\s*/i, '')
+              .replace(/\s+город.*$/i, '')
+              .replace(/[-\s]/g, '')
+              .trim()
+          }
+          
+          const normalizedCity = normalizeCityName(data.city)
+          
+          // Ищем похожий город в списке доступных
           const matchedCity = availableCities.find(c => {
-            const cLower = c.toLowerCase()
-            const cityLower = data.city.toLowerCase()
-            return cLower === cityLower || 
-                   cLower.includes(cityLower) || 
-                   cityLower.includes(cLower)
+            const normalizedAvailable = normalizeCityName(c)
+            return normalizedAvailable === normalizedCity ||
+                   normalizedAvailable.includes(normalizedCity) ||
+                   normalizedCity.includes(normalizedAvailable)
           })
           
-          if (matchedCity) {
-            setCityFilter(matchedCity)
-            setLocationDetected(true)
-            if (data.coordinates) {
-              setUserCoordinates(data.coordinates)
-            }
-            await fetchCompanies()
-            setDetectingLocation(false)
-            return true
-          } else if (data.city) {
-            setCityFilter(data.city)
-            setLocationDetected(true)
-            if (data.coordinates) {
-              setUserCoordinates(data.coordinates)
-            }
-            await fetchCompanies()
-            setDetectingLocation(false)
-            return true
+          // Специальные случаи
+          const cityAliases: Record<string, string[]> = {
+            'санкт-петербург': ['спб', 'петербург', 'ленинград'],
+            'москва': ['мск'],
+            'нижний новгород': ['нн', 'нижний'],
+            'ростов-на-дону': ['ростов'],
+            'набережные челны': ['челны']
           }
+          
+          let finalCity = matchedCity
+          if (!finalCity && cityAliases[normalizedCity]) {
+            const aliases = cityAliases[normalizedCity]
+            for (const alias of aliases) {
+              const found = availableCities.find(c => 
+                normalizeCityName(c).includes(alias) || 
+                alias.includes(normalizeCityName(c))
+              )
+              if (found) {
+                finalCity = found
+                break
+              }
+            }
+          }
+          
+          const cityToUse = finalCity || data.city
+          setCityFilter(cityToUse)
+          setLocationDetected(true)
+          if (data.coordinates) {
+            setUserCoordinates(data.coordinates)
+          }
+          await fetchCompanies()
+          setDetectingLocation(false)
+          return true
         }
       }
     } catch (ipError) {
