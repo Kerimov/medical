@@ -216,7 +216,10 @@ async function processDocumentOCR(documentId: string) {
         })
 
         // Сохраняем анализ как структурированную запись
-        await saveAnalysisFromDocument(documentId)
+        console.log(`[OCR] Calling saveAnalysisFromDocument for document ${documentId}`)
+        await saveAnalysisFromDocument(documentId).catch((err) => {
+          console.error(`[OCR] Error in saveAnalysisFromDocument for ${documentId}:`, err)
+        })
       } catch (e: any) {
         if (e?.code === 'P2025') {
           console.warn(`[OCR] Document ${documentId} was removed before update (real OCR). Skipping.`)
@@ -392,12 +395,27 @@ async function processDocumentOCR(documentId: string) {
 // Создать запись анализа из данных документа
 async function saveAnalysisFromDocument(documentId: string) {
   try {
+    console.log(`[Analysis] Attempting to save analysis for document ${documentId}`)
     const doc = await prisma.document.findUnique({ where: { id: documentId } })
-    if (!doc || !doc.parsed) return
+    
+    if (!doc) {
+      console.warn(`[Analysis] Document ${documentId} not found`)
+      return
+    }
+    
+    if (!doc.parsed) {
+      console.warn(`[Analysis] Document ${documentId} is not parsed yet, skipping analysis creation`)
+      return
+    }
+
+    console.log(`[Analysis] Document ${documentId} is parsed, creating analysis record`)
 
     // Подготовка данных анализа
     const indicators = Array.isArray(doc.indicators) ? doc.indicators : []
     const hasDeviations = indicators.some((i: any) => i && i.isNormal === false)
+    
+    console.log(`[Analysis] Indicators count: ${indicators.length}, deviations: ${hasDeviations}`)
+    
     const resultsPayload = {
       indicators,
       findings: doc.findings || null,
@@ -420,16 +438,23 @@ async function saveAnalysisFromDocument(documentId: string) {
       },
     })
 
+    console.log(`[Analysis] ✅ Successfully created analysis ${analysis.id} with status: ${analysis.status}`)
+
     // Автоматически создаем напоминания если есть отклонения
     if (hasDeviations && indicators.length > 0) {
       try {
         await generateRemindersFromAnalysis(analysis, indicators)
+        console.log(`[Analysis] ✅ Created reminders for analysis ${analysis.id}`)
       } catch (err) {
-        console.warn('[OCR] Failed to generate reminders:', err)
+        console.warn('[Analysis] Failed to generate reminders:', err)
       }
     }
   } catch (err) {
-    console.warn('[OCR] Failed to save analysis record:', err)
+    console.error('[Analysis] ❌ Failed to save analysis record:', err)
+    console.error('[Analysis] Error details:', err instanceof Error ? err.message : String(err))
+    if (err instanceof Error && err.stack) {
+      console.error('[Analysis] Stack trace:', err.stack)
+    }
   }
 }
 
