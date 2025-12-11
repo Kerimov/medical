@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 
+// Использует cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const token = request.cookies.get('token')?.value

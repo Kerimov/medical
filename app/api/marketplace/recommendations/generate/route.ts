@@ -3,6 +3,9 @@ import { verifyToken } from '@/lib/auth'
 import { createEnhancedRecommendationsForUser } from '@/lib/ai-recommendations-enhanced'
 import { logger } from '@/lib/logger'
 
+// Использует cookies/headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // POST /api/marketplace/recommendations/generate - сгенерировать новые рекомендации
 export async function POST(request: NextRequest) {
   try {

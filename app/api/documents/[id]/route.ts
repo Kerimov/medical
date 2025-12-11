@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
+// Использует headers/cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // GET - получить документ по ID
 export async function GET(
   request: NextRequest,

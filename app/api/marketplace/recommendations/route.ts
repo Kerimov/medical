@@ -4,6 +4,9 @@ import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { createEnhancedRecommendationsForUser } from '@/lib/ai-recommendations-enhanced'
 
+// Использует cookies/headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // GET /api/marketplace/recommendations - получить персонализированные рекомендации
 export async function GET(request: NextRequest) {
   try {

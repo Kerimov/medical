@@ -3,6 +3,9 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { parse as parseCookies } from 'cookie'
 
+// Использует headers/cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')

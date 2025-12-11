@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
 
+// Использует headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Проверяем токен

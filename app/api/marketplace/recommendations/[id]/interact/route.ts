@@ -3,6 +3,9 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
+// Использует cookies/headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // POST /api/marketplace/recommendations/[id]/interact - зафиксировать взаимодействие с рекомендацией
 export async function POST(
   request: NextRequest,

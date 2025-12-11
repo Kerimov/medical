@@ -4,6 +4,9 @@ import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 import { getAIConfig } from '@/lib/ai-medical-parser'
 
+// Использует headers/cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')

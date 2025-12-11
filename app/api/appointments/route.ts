@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
+// Использует headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // Получение всех записей для пациента
 export async function GET(request: NextRequest) {
   try {

@@ -3,6 +3,9 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
+// Использует headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // GET /api/reminders - получить все напоминания пользователя
 export async function GET(request: NextRequest) {
   try {

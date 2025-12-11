@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { createRecommendationsForUser } from '@/lib/ai-recommendations'
 
+// Использует cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Проверяем токен

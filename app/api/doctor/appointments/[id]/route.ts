@@ -3,6 +3,9 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
+// Использует headers/cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

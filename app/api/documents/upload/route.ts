@@ -4,6 +4,9 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
+// Использует headers/cookies, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 // Размер файла в байтах (10 MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 
+// Использует headers, помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     // Простая защита: требуем Bearer токен
