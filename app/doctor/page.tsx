@@ -161,6 +161,25 @@ export default function DoctorDashboard() {
     }
   }
 
+  async function openExistingReport(appointmentId: string) {
+    try {
+      setReportBusyId(appointmentId)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const res = await fetch(`/api/doctor/appointments/${appointmentId}/report`, {
+        headers: lsToken ? { Authorization: `Bearer ${lsToken}` } : undefined,
+        credentials: 'include'
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Отчёт не найден')
+      setReportMarkdown(String(data?.markdown || ''))
+      setReportOpen(true)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setReportBusyId(null)
+    }
+  }
+
   if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center">
@@ -447,6 +466,7 @@ export default function DoctorDashboard() {
                         </div>
                         <div className="flex items-center gap-2">
                           {previsitBadge(a?.preVisit?.submittedAt)}
+                          {a?.doctorReport ? <Badge className="bg-purple-100 text-purple-800">Отчёт ✓</Badge> : <Badge className="bg-gray-100 text-gray-800">Отчёт —</Badge>}
                           {riskBadge(a?.lastAnalysis?.status)}
                         </div>
                       </div>
@@ -462,9 +482,15 @@ export default function DoctorDashboard() {
                         <Link href={`/doctor/appointments/${a.id}/previsit`}>
                           <Button size="sm" variant="outline">Анкета</Button>
                         </Link>
-                        <Button size="sm" onClick={() => generateReport(a.id)} disabled={reportBusyId === a.id}>
-                          {reportBusyId === a.id ? 'Формирую…' : 'Сводка к приёму'}
-                        </Button>
+                        {a?.doctorReport ? (
+                          <Button size="sm" variant="secondary" onClick={() => openExistingReport(a.id)} disabled={reportBusyId === a.id}>
+                            {reportBusyId === a.id ? 'Открываю…' : 'Открыть отчёт'}
+                          </Button>
+                        ) : (
+                          <Button size="sm" onClick={() => generateReport(a.id)} disabled={reportBusyId === a.id}>
+                            {reportBusyId === a.id ? 'Формирую…' : 'Сформировать отчёт'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}

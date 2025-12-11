@@ -191,12 +191,14 @@ export async function POST(request: NextRequest) {
     let preVisitBlock: any = null
     let derivedComplaints = complaints
     let derivedMedications = medications
+    let appointmentForLink: { id: string; patientId: string; doctorId: string } | null = null
     if (appointmentId) {
       const appt = await prisma.appointment.findUnique({
         where: { id: appointmentId },
         select: { id: true, patientId: true, doctorId: true, scheduledAt: true, appointmentType: true }
       })
       if (!appt) return NextResponse.json({ error: 'Запись не найдена' }, { status: 404 })
+      appointmentForLink = { id: appt.id, patientId: appt.patientId, doctorId: appt.doctorId }
 
       // доступ: пациент (владелец) или врач (по doctorId)
       const isPatient = appt.patientId === payload.userId
@@ -372,6 +374,22 @@ ${JSON.stringify(compactAnalyses, null, 2)}
         tags: 'doctor_report'
       }
     })
+
+    // link report to appointment so doctor can find it from their cabinet
+    if (appointmentForLink) {
+      await prisma.doctorReport.upsert({
+        where: { appointmentId: appointmentForLink.id },
+        create: {
+          appointmentId: appointmentForLink.id,
+          doctorId: appointmentForLink.doctorId,
+          patientId: appointmentForLink.patientId,
+          documentId: doc.id
+        },
+        update: {
+          documentId: doc.id
+        }
+      }).catch(() => {})
+    }
 
     return NextResponse.json({
       message: 'Отчёт сформирован',

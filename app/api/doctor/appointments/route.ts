@@ -43,6 +43,15 @@ export async function GET(request: NextRequest) {
       orderBy: { scheduledAt: 'desc' }
     })
 
+    const apptIds = appointments.map((a) => a.id)
+    const reports = apptIds.length
+      ? await prisma.doctorReport.findMany({
+          where: { appointmentId: { in: apptIds } },
+          select: { appointmentId: true, documentId: true, createdAt: true }
+        })
+      : []
+    const reportByApptId = new Map(reports.map((r) => [r.appointmentId, { documentId: r.documentId, createdAt: r.createdAt }]))
+
     // Форматируем данные для ответа
     const formattedAppointments = appointments.map(appointment => ({
       id: appointment.id,
@@ -60,6 +69,7 @@ export async function GET(request: NextRequest) {
         submittedAt: appointment.preVisit.submittedAt,
         updatedAt: appointment.preVisit.updatedAt
       } : null,
+      doctorReport: reportByApptId.get(appointment.id) || null,
       createdAt: appointment.createdAt,
       updatedAt: appointment.updatedAt
     }))

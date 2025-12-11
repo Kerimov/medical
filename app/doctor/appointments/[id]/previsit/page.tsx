@@ -16,6 +16,8 @@ export default function DoctorAppointmentPrevisitPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState<any | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportMarkdown, setReportMarkdown] = useState<string>('')
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login')
@@ -85,6 +87,28 @@ export default function DoctorAppointmentPrevisitPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+                    const res = await fetch(`/api/doctor/appointments/${params.id}/report`, {
+                      headers: lsToken ? { Authorization: `Bearer ${lsToken}` } : undefined,
+                      credentials: 'include'
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(data?.error || 'Отчёт не найден')
+                    setReportMarkdown(String(data?.markdown || ''))
+                    setReportOpen(true)
+                  } catch (e) {
+                    alert(e instanceof Error ? e.message : 'Ошибка')
+                  }
+                }}
+              >
+                Открыть отчёт
+              </Button>
+            </div>
             {!q?.answers ? (
               <div className="text-sm text-muted-foreground">Нет данных анкеты.</div>
             ) : (
@@ -97,6 +121,25 @@ export default function DoctorAppointmentPrevisitPage() {
             )}
           </CardContent>
         </Card>
+
+        {reportOpen && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
+            <Card className="w-full max-w-3xl bg-white">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle>Отчёт к приёму (preview)</CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => setReportOpen(false)}>✕</Button>
+                </div>
+                <CardDescription>Это отчёт, который пациент/врач сформировал перед визитом.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="whitespace-pre-wrap text-sm bg-gray-50 border rounded p-4 max-h-[60vh] overflow-auto">
+{reportMarkdown || '—'}
+                </pre>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

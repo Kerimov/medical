@@ -50,6 +50,15 @@ export async function GET(request: NextRequest) {
       orderBy: { scheduledAt: 'asc' }
     })
 
+    const apptIds = appts.map((a) => a.id)
+    const reports = apptIds.length
+      ? await prisma.doctorReport.findMany({
+          where: { appointmentId: { in: apptIds } },
+          select: { appointmentId: true, documentId: true, createdAt: true }
+        })
+      : []
+    const reportByApptId = new Map(reports.map((r) => [r.appointmentId, { documentId: r.documentId, createdAt: r.createdAt }]))
+
     const patientIds = Array.from(new Set(appts.map((a) => a.patientId).filter(Boolean)))
     const analyses = patientIds.length
       ? await prisma.analysis.findMany({
@@ -78,6 +87,7 @@ export async function GET(request: NextRequest) {
         patientEmail: a.patientEmail,
         patientPhone: a.patientPhone,
         preVisit: a.preVisit ? { submittedAt: a.preVisit.submittedAt, updatedAt: a.preVisit.updatedAt } : null,
+        doctorReport: reportByApptId.get(a.id) || null,
         lastAnalysis: la
           ? { id: la.id, title: la.title, status: la.status, date: la.date }
           : null
