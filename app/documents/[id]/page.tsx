@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -332,7 +333,7 @@ export default function DocumentViewPage() {
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Тип исследования</div>
                       <Input
-                        value={fixEdits.studyType ?? (document.studyType || '')}
+                        value={fixEdits.studyType !== undefined ? fixEdits.studyType : (document.studyType || '')}
                         onChange={(e) => setFixEdits((p) => ({ ...p, studyType: e.target.value }))}
                         placeholder="Напр. Клинический анализ крови"
                       />
@@ -341,14 +342,14 @@ export default function DocumentViewPage() {
                       <div className="text-xs text-muted-foreground mb-1">Дата исследования</div>
                       <Input
                         type="date"
-                        value={fixEdits.studyDate ?? (document.studyDate ? new Date(document.studyDate).toISOString().slice(0, 10) : '')}
+                        value={fixEdits.studyDate !== undefined ? fixEdits.studyDate : (document.studyDate ? new Date(document.studyDate).toISOString().slice(0, 10) : '')}
                         onChange={(e) => setFixEdits((p) => ({ ...p, studyDate: e.target.value }))}
                       />
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Лаборатория</div>
                       <Input
-                        value={fixEdits.laboratory ?? (document.laboratory || '')}
+                        value={fixEdits.laboratory !== undefined ? fixEdits.laboratory : (document.laboratory || '')}
                         onChange={(e) => setFixEdits((p) => ({ ...p, laboratory: e.target.value }))}
                         placeholder="Напр. Инвитро"
                       />
@@ -356,7 +357,7 @@ export default function DocumentViewPage() {
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Врач (если есть)</div>
                       <Input
-                        value={fixEdits.doctor ?? (document.doctor || '')}
+                        value={fixEdits.doctor !== undefined ? fixEdits.doctor : (document.doctor || '')}
                         onChange={(e) => setFixEdits((p) => ({ ...p, doctor: e.target.value }))}
                         placeholder="ФИО врача"
                       />
