@@ -559,22 +559,40 @@ export async function createEnhancedRecommendationsForUser(
 
         logger.info(`Found companies: labs=${labs.length}, clinics=${clinics.length}`, 'recommendations')
 
+        // Создаем уникальные рекомендации для каждого анализа
+        const uniqueAnalysisTitles = new Set<string>()
+        
         for (const a of abnormalAnalyses.slice(0, 2)) {
+          const analysisTitle = a.title || a.type || 'Анализ'
+          const analysisKey = `${a.type}-${analysisTitle}`
+          
+          // Пропускаем, если уже создали рекомендацию для этого типа анализа
+          if (uniqueAnalysisTitles.has(analysisKey)) {
+            logger.info(`Skipping duplicate analysis type: ${analysisKey}`, 'recommendations')
+            continue
+          }
+          
+          uniqueAnalysisTitles.add(analysisKey)
+          
           // Создаем рекомендации БЕЗ привязки к компаниям
           recommendations.push({
             userId,
             type: 'ANALYSIS',
-            title: `Контрольный анализ: ${a.title || a.type}`,
+            title: `Контрольный анализ: ${analysisTitle}`,
             description: 'Рекомендуем пересдать анализ для подтверждения отклонений и мониторинга динамики. Можно сдать в любой лаборатории.',
             reason: 'Обнаружены отклонения в результатах анализа',
             priority: 4,
             companyId: null,
+            analysisId: a.id,
             metadata: { 
-              analysisId: (a as any).id, 
+              analysisId: a.id, 
               aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль для подтверждения и мониторинга динамики.' 
             }
           })
-
+        }
+        
+        // Создаем общую рекомендацию по консультации врача (только один раз)
+        if (abnormalAnalyses.length > 0) {
           recommendations.push({
             userId,
             type: 'SERVICE',
@@ -584,45 +602,42 @@ export async function createEnhancedRecommendationsForUser(
             priority: 3,
             companyId: null,
             metadata: { 
-              analysisId: (a as any).id, 
               aiExplanation: 'Очная консультация нужна для выбора дальнейших шагов и исключения серьёзной патологии.' 
             }
           })
+        }
 
-          // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
-          if (labs.length > 0) {
-            recommendations.push({
-              userId,
-              type: 'ANALYSIS',
-              title: `Лаборатория "${labs[0].name}" для сдачи анализа`,
-              description: `Можете сдать контрольный анализ "${a.title || a.type}" в этой лаборатории.`,
-              reason: 'Обнаружены отклонения в результатах анализа',
-              priority: 3,
-              companyId: labs[0].id,
-              metadata: { 
-                analysisId: (a as any).id, 
-                distance: (labs[0] as any).distance, 
-                aiExplanation: 'Ближайшая лаборатория для сдачи анализа.' 
-              }
-            })
-          }
+        // Добавляем рекомендации с компаниями только один раз (не для каждого анализа)
+        if (labs.length > 0 && abnormalAnalyses.length > 0) {
+          recommendations.push({
+            userId,
+            type: 'ANALYSIS',
+            title: `Лаборатория "${labs[0].name}" для сдачи анализа`,
+            description: 'Можете сдать контрольные анализы в этой лаборатории.',
+            reason: 'Обнаружены отклонения в результатах анализа',
+            priority: 3,
+            companyId: labs[0].id,
+            metadata: { 
+              distance: (labs[0] as any).distance, 
+              aiExplanation: 'Ближайшая лаборатория для сдачи анализа.' 
+            }
+          })
+        }
 
-          if (clinics.length > 0) {
-            recommendations.push({
-              userId,
-              type: 'SERVICE',
-              title: `Клиника "${clinics[0].name}" для консультации`,
-              description: 'Можете записаться на консультацию в эту клинику.',
-              reason: 'Обнаружены отклонения в анализе',
-              priority: 2,
-              companyId: clinics[0].id,
-              metadata: { 
-                analysisId: (a as any).id, 
-                distance: (clinics[0] as any).distance, 
-                aiExplanation: 'Ближайшая клиника для консультации.' 
-              }
-            })
-          }
+        if (clinics.length > 0 && abnormalAnalyses.length > 0) {
+          recommendations.push({
+            userId,
+            type: 'SERVICE',
+            title: `Клиника "${clinics[0].name}" для консультации`,
+            description: 'Можете записаться на консультацию в эту клинику.',
+            reason: 'Обнаружены отклонения в анализе',
+            priority: 2,
+            companyId: clinics[0].id,
+            metadata: { 
+              distance: (clinics[0] as any).distance, 
+              aiExplanation: 'Ближайшая клиника для консультации.' 
+            }
+          })
         }
       } else if (recentAnalyses.length > 0 || documents.length > 0) {
         // Если есть анализы или документы, но нет отклонений - создаем общие рекомендации
@@ -701,28 +716,77 @@ export async function createEnhancedRecommendationsForUser(
     const createdRecommendations = []
     for (const rec of recommendations) {
       try {
-        // Idempotency: skip if a similar recommendation already exists
-        const existing = await prisma.recommendation.findFirst({
-          where: {
+        // Извлекаем analysisId из метаданных для более точной проверки
+        const recAnalysisId = rec.metadata?.analysisId || rec.analysisId || null
+        
+        // Idempotency: проверяем существующие рекомендации более тщательно
+        // Проверяем по нескольким критериям:
+        // 1. Тип, заголовок и компания
+        // 2. AnalysisId в метаданных (если есть)
+        // 3. Не создаем дубликаты за последние 7 дней
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        
+        const existingConditions: any[] = [
+          {
             userId,
             type: rec.type,
             title: rec.title,
-            companyId: rec.companyId || undefined,
-            status: { in: ['ACTIVE', 'VIEWED', 'CLICKED'] }
+            companyId: rec.companyId || null,
+            createdAt: { gte: sevenDaysAgo }
+          }
+        ]
+        
+        // Если есть analysisId, добавляем дополнительную проверку
+        if (recAnalysisId) {
+          existingConditions.push({
+            userId,
+            type: rec.type,
+            analysisId: recAnalysisId,
+            createdAt: { gte: sevenDaysAgo }
+          })
+        }
+        
+        const existing = await prisma.recommendation.findFirst({
+          where: {
+            OR: existingConditions,
+            // Не учитываем только отклоненные рекомендации (если пользователь отклонил, можно создать снова)
+            status: { not: 'DISMISSED' }
           }
         })
+        
         if (existing) {
+          logger.info(`Skipping duplicate recommendation: ${rec.type} - ${rec.title}`, 'recommendations')
           continue
         }
 
         const created = await prisma.recommendation.create({
-          data: rec,
+          data: {
+            userId: rec.userId,
+            type: rec.type,
+            title: rec.title,
+            description: rec.description,
+            reason: rec.reason,
+            priority: rec.priority,
+            companyId: rec.companyId || null,
+            productId: rec.productId || null,
+            analysisId: rec.analysisId || null,
+            metadata: rec.metadata ? JSON.stringify(rec.metadata) : null,
+            expiresAt: rec.expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 дней по умолчанию
+          },
           include: {
             company: true,
-            product: true
+            product: true,
+            analysis: {
+              select: {
+                id: true,
+                title: true,
+                type: true
+              }
+            }
           }
         })
         createdRecommendations.push(created)
+        logger.info(`Created recommendation: ${rec.type} - ${rec.title}`, 'recommendations')
       } catch (error) {
         logger.error('Error creating recommendation:', error)
       }
