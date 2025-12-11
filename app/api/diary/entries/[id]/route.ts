@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-import { resolvePatientId } from '@/lib/caretaker-access'
+import { isResolvePatientErr, resolvePatientId } from '@/lib/caretaker-access'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = req.headers.get('authorization')
@@ -14,7 +14,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { patientId, entryDate, mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes, tags } = body
 
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'diary_write' })
-  if (!resolved.ok) {
+  if (isResolvePatientErr(resolved)) {
     return NextResponse.json({ error: resolved.error }, { status: resolved.status })
   }
 
@@ -55,7 +55,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { searchParams } = new URL(req.url)
   const patientIdParam = searchParams.get('patientId')
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: patientIdParam, capability: 'diary_write' })
-  if (!resolved.ok) {
+  if (isResolvePatientErr(resolved)) {
     return NextResponse.json({ error: resolved.error }, { status: resolved.status })
   }
 

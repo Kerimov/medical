@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-import { resolvePatientId } from '@/lib/caretaker-access'
+import { isResolvePatientErr, resolvePatientId } from '@/lib/caretaker-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_read' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { resolvePatientId } from '@/lib/caretaker-access'
+import { isResolvePatientErr, resolvePatientId } from '@/lib/caretaker-access'
 
 // Использует headers, помечаем маршрут как динамический
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,7 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_read' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 
@@ -80,7 +80,7 @@ export async function PUT(
     } = body
 
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'reminders_write' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 
@@ -134,7 +134,7 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_write' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 

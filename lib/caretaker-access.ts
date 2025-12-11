@@ -7,6 +7,10 @@ export type ResolvePatientOk = { ok: true; patientId: string }
 export type ResolvePatientErr = { ok: false; status: number; error: string }
 export type ResolvePatientResult = ResolvePatientOk | ResolvePatientErr
 
+export function isResolvePatientErr(x: ResolvePatientResult): x is ResolvePatientErr {
+  return x.ok === false
+}
+
 function can(permissions: any, cap: CareCapability): boolean {
   const p = permissions || {}
   if (cap === 'diary_read') return !!p?.diary?.read

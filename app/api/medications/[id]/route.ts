@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-import { resolvePatientId } from '@/lib/caretaker-access'
+import { isResolvePatientErr, resolvePatientId } from '@/lib/caretaker-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +19,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json().catch(() => ({}))
     const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 
@@ -65,7 +65,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { searchParams } = new URL(req.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
-    if (!resolved.ok) {
+    if (isResolvePatientErr(resolved)) {
       return NextResponse.json({ error: resolved.error }, { status: resolved.status })
     }
 
