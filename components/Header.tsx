@@ -68,7 +68,6 @@ export function Header() {
                     <BookOpen className="h-4 w-4" />
                     База знаний
                   </Link>
-                  <Link href="/marketplace" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Рекомендации</Link>
                 </>
               )}
             </>
@@ -164,7 +163,6 @@ export function Header() {
                       <BookOpen className="h-4 w-4" />
                       База знаний
                     </Link>
-                    <Link href="/marketplace" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Рекомендации</Link>
                   </>
                 )}
                 {/* Ссылка "Врач" скрыта в мобильном меню */}

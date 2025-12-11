@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { generateCompaniesWithAI } from '@/lib/ai-companies-generator'
 
 // Этот маршрут читает request.url (query-параметры), поэтому помечаем его как динамический,
 // чтобы Next.js не пытался рендерить его статически на этапе билда.
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
       where.AND = conditions
     }
 
-    const [companiesData, total] = await Promise.all([
+    let [companiesData, total] = await Promise.all([
       prisma.company.findMany({
         where,
         include: {
@@ -120,6 +121,115 @@ export async function GET(request: NextRequest) {
       }),
       prisma.company.count({ where })
     ])
+
+    // Если компаний нет или их мало, и указан город, генерируем через OpenAI
+    if (total === 0 && city && city !== 'all' && process.env.OPENAI_API_KEY) {
+      try {
+        logger.info(`[COMPANIES] Генерация компаний через OpenAI для города: ${city}, тип: ${type || 'all'}`)
+        
+        // Определяем типы компаний для генерации
+        const typesToGenerate = type && type !== 'all' 
+          ? [type] 
+          : ['CLINIC', 'LABORATORY'] // По умолчанию клиники и лаборатории
+        
+        logger.info(`[COMPANIES] Типы для генерации: ${typesToGenerate.join(', ')}`)
+        
+        // Генерируем компании через OpenAI
+        const generatedCompanies = await generateCompaniesWithAI(
+          city,
+          typesToGenerate,
+          Math.max(limit, 10) // Генерируем минимум 10 компаний
+        )
+
+        logger.info(`[COMPANIES] Сгенерировано ${generatedCompanies.length} компаний через OpenAI`)
+
+        // Сохраняем сгенерированные компании в базу данных
+        const savedCompanies = []
+        for (const companyData of generatedCompanies) {
+          try {
+            // Проверяем, не существует ли уже компания с таким именем и городом
+            const existing = await prisma.company.findFirst({
+              where: {
+                name: companyData.name,
+                city: companyData.city
+              }
+            })
+
+            if (!existing) {
+              const saved = await prisma.company.create({
+                data: {
+                  name: companyData.name,
+                  type: companyData.type,
+                  description: companyData.description,
+                  address: companyData.address,
+                  city: companyData.city,
+                  phone: companyData.phone,
+                  email: companyData.email,
+                  website: companyData.website,
+                  rating: companyData.rating,
+                  reviewCount: companyData.reviewCount,
+                  coordinates: companyData.coordinates ? JSON.parse(JSON.stringify(companyData.coordinates)) : null,
+                  workingHours: companyData.workingHours ? JSON.parse(JSON.stringify(companyData.workingHours)) : null,
+                  isVerified: companyData.isVerified,
+                  isActive: true
+                },
+                include: {
+                  products: {
+                    where: { isAvailable: true },
+                    take: 3
+                  },
+                  _count: {
+                    select: { 
+                      recommendations: true,
+                      products: true
+                    }
+                  }
+                }
+              })
+              savedCompanies.push(saved)
+            }
+          } catch (saveError) {
+            logger.error(`[COMPANIES] Ошибка сохранения компании ${companyData.name}:`, saveError)
+            // Продолжаем, даже если одна компания не сохранилась
+          }
+        }
+
+        logger.info(`[COMPANIES] Сохранено ${savedCompanies.length} новых компаний в базу`)
+
+        // Обновляем данные из базы с учетом новых компаний
+        const [updatedCompaniesData, updatedTotal] = await Promise.all([
+          prisma.company.findMany({
+            where,
+            include: {
+              products: {
+                where: { isAvailable: true },
+                take: 3
+              },
+              _count: {
+                select: { 
+                  recommendations: true,
+                  products: true
+                }
+              }
+            },
+            orderBy: [
+              { isVerified: 'desc' },
+              { rating: 'desc' },
+              { name: 'asc' }
+            ],
+            take: limit * 2,
+            skip: offset
+          }),
+          prisma.company.count({ where })
+        ])
+
+        companiesData = updatedCompaniesData
+        total = updatedTotal
+      } catch (aiError) {
+        logger.error('[COMPANIES] Ошибка генерации компаний через OpenAI:', aiError)
+        // Продолжаем с пустым списком, если генерация не удалась
+      }
+    }
 
     // Если есть координаты пользователя, вычисляем расстояние и сортируем
     let companies = companiesData

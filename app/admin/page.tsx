@@ -285,29 +285,6 @@ export default function AdminPage() {
             </Card>
           </Link>
 
-          <Link href="/admin/recommendations" className="block group">
-            <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 to-green-500/10 group-hover:scale-110 transition-transform duration-300">
-                    <Heart className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="w-2 h-2 bg-medical-coral rounded-full"></div>
-                </div>
-                <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">Рекомендации</CardTitle>
-                <CardDescription className="text-sm leading-relaxed">
-                  Управление рекомендациями и компаниями в маркетплейсе
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <Button className="w-full gradient-primary text-white hover:opacity-90 transition-opacity shadow-medical">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Управлять
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-
           <Link href="/admin/reminders" className="block group">
             <Card className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300 cursor-pointer h-full group-hover:scale-105">
               <CardHeader className="pb-4">

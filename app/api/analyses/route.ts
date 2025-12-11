@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
-import { createRecommendationsForUser } from '@/lib/ai-recommendations'
 
 // Использует cookies/headers, помечаем маршрут как динамический
 export const dynamic = 'force-dynamic'
@@ -72,15 +71,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Генерируем рекомендации, если анализ имеет отклонения
-    if (status === 'abnormal') {
-      try {
-        await createRecommendationsForUser(payload.userId, analysis.id)
-      } catch (error) {
-        console.error('Error generating recommendations:', error)
-        // Не прерываем создание анализа из-за ошибки рекомендаций
-      }
-    }
+    // Рекомендации будут генерироваться в новом разделе рекомендаций
 
     return NextResponse.json({
       message: 'Анализ успешно сохранен',
