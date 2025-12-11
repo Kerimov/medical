@@ -4,6 +4,9 @@ import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 import { getAIConfig } from '@/lib/ai-medical-parser'
 
+// Использует request.url и заголовки/cookie, поэтому помечаем маршрут как динамический
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url)
