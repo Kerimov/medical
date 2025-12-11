@@ -53,6 +53,7 @@ export function AIChat() {
     if (isOpen && availableDocuments.length === 0) {
       fetchDocuments()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const fetchDocuments = async () => {
