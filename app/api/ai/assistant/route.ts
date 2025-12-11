@@ -1415,6 +1415,7 @@ async function generateAIResponse(
   documentIds: string[],
   ragScope: 'none' | 'attached' | 'all'
 ): Promise<AiResponseWithSources> {
+  const patientProfile = await prisma.patientProfile.findUnique({ where: { userId } }).catch(() => null)
   const hasDocs = Array.isArray(documentIds) && documentIds.length > 0
   const rag =
     ragScope === 'all'
@@ -1443,9 +1444,13 @@ async function generateAIResponse(
 3) Что делать дальше (практические шаги)
 4) Источники: перечисли использованные SOURCE (например: SOURCE 1, SOURCE 2). Если у SOURCE есть URL — добавь его.`
 
+      const profileBlock = patientProfile
+        ? `\n\nПРОФИЛЬ ПАЦИЕНТА (контекст, если релевантно):\n${JSON.stringify(patientProfile)}\n`
+        : ''
+
       const userBlock =
         rag.contextText && rag.contextText.trim().length > 0
-          ? `ДАННЫЕ (RAG):\n${rag.contextText}\n\nВопрос пациента: ${message}`
+          ? `ДАННЫЕ (RAG):\n${rag.contextText}${profileBlock}\nВопрос пациента: ${message}`
           : `Вопрос пациента: ${message}`
 
       const text = await callOpenAIChat({
