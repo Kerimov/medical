@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
+// Маршрут использует request.headers (Authorization), поэтому помечаем его как динамический,
+// чтобы Next.js не пытался выполнять его при статическом экспорте.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
