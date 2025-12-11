@@ -170,11 +170,13 @@ export default function NewPatient() {
                       <SelectValue placeholder="Выберите пациента" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name} ({user.email})
-                        </SelectItem>
-                      ))}
+                      {users
+                        .filter((u: any) => u && u.id && typeof u.name === 'string')
+                        .map((u: any) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.name} ({u.email || '—'})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
