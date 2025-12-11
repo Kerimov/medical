@@ -40,6 +40,11 @@ export default function DoctorDashboard() {
   const [stats, setStats] = useState<DoctorStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [doctorAppointments, setDoctorAppointments] = useState<any[]>([])
+  const [day, setDay] = useState<any[] | null>(null)
+  const [dayError, setDayError] = useState<string | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportMarkdown, setReportMarkdown] = useState<string>('')
+  const [reportBusyId, setReportBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -102,10 +107,57 @@ export default function DoctorDashboard() {
       } catch (e) {
         console.warn('Failed to load doctor appointments', e)
       }
+
+      // Day view (today+tomorrow) with previsit + last analysis
+      try {
+        const dayRes = await fetch('/api/doctor/day', { headers, credentials: 'include' })
+        const dayJson = await dayRes.json().catch(() => ({}))
+        if (dayRes.ok) {
+          setDay(Array.isArray(dayJson?.appointments) ? dayJson.appointments : [])
+          setDayError(null)
+        } else {
+          setDay(null)
+          setDayError(dayJson?.error || 'Ошибка загрузки дня')
+        }
+      } catch (e) {
+        setDay(null)
+        setDayError('Ошибка загрузки дня')
+      }
     } catch (error) {
       console.error('Error fetching doctor stats:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const riskBadge = (status: string | null | undefined) => {
+    const s = String(status || '').toLowerCase()
+    if (s === 'critical') return <Badge className="bg-red-100 text-red-800">Critical</Badge>
+    if (s === 'abnormal') return <Badge className="bg-yellow-100 text-yellow-800">Attention</Badge>
+    if (!s) return <Badge variant="secondary">—</Badge>
+    return <Badge className="bg-green-100 text-green-800">OK</Badge>
+  }
+
+  const previsitBadge = (submittedAt: any) => {
+    return submittedAt
+      ? <Badge className="bg-green-100 text-green-800">Pre‑visit ✓</Badge>
+      : <Badge className="bg-gray-100 text-gray-800">Pre‑visit —</Badge>
+  }
+
+  async function generateReport(appointmentId: string) {
+    try {
+      setReportBusyId(appointmentId)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const headers = lsToken ? { 'Content-Type': 'application/json', Authorization: `Bearer ${lsToken}` } : { 'Content-Type': 'application/json' }
+      const res = await fetch('/api/reports/doctor-summary', { method: 'POST', headers, credentials: 'include', body: JSON.stringify({ appointmentId }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка отчёта')
+      setReportMarkdown(String(data?.markdown || ''))
+      setReportOpen(true)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setReportBusyId(null)
     }
   }
 
@@ -366,6 +418,81 @@ export default function DoctorDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Day view: Today + Tomorrow */}
+        <div className="mt-8">
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                День врача (сегодня + завтра)
+              </CardTitle>
+              <CardDescription>
+                Pre‑visit анкета + быстрые действия + последний анализ пациента.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {dayError && <div className="text-sm text-destructive mb-3">{dayError}</div>}
+              {!day || day.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Нет приёмов на сегодня/завтра.</div>
+              ) : (
+                <div className="space-y-3">
+                  {day.map((a: any) => (
+                    <div key={a.id} className="p-4 rounded-lg border bg-white/70">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-medium">{a.patientName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(a.scheduledAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} • {a.appointmentType}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {previsitBadge(a?.preVisit?.submittedAt)}
+                          {riskBadge(a?.lastAnalysis?.status)}
+                        </div>
+                      </div>
+                      {a?.lastAnalysis ? (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          Последний анализ: {new Date(a.lastAnalysis.date).toLocaleDateString('ru-RU')} — {a.lastAnalysis.title}
+                        </div>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link href={`/doctor/patients/${a.patientId}`}>
+                          <Button size="sm" variant="outline">Карточка</Button>
+                        </Link>
+                        <Link href={`/doctor/appointments/${a.id}/previsit`}>
+                          <Button size="sm" variant="outline">Анкета</Button>
+                        </Link>
+                        <Button size="sm" onClick={() => generateReport(a.id)} disabled={reportBusyId === a.id}>
+                          {reportBusyId === a.id ? 'Формирую…' : 'Сводка к приёму'}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Report modal */}
+        {reportOpen && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4">
+            <Card className="w-full max-w-3xl bg-white">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle>Сводка к приёму (preview)</CardTitle>
+                  <Button variant="outline" size="sm" onClick={() => setReportOpen(false)}>✕</Button>
+                </div>
+                <CardDescription>Можно копировать/печатать. Документ также сохранён у пациента.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="whitespace-pre-wrap text-sm bg-gray-50 border rounded p-4 max-h-[60vh] overflow-auto">
+{reportMarkdown || '—'}
+                </pre>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )

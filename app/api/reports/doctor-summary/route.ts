@@ -375,7 +375,8 @@ ${JSON.stringify(compactAnalyses, null, 2)}
 
     return NextResponse.json({
       message: 'Отчёт сформирован',
-      documentId: doc.id
+      documentId: doc.id,
+      markdown
     })
   } catch (error) {
     console.error('[doctor-summary] error:', error)
