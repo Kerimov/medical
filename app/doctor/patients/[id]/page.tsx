@@ -101,7 +101,7 @@ export default function PatientCardPage() {
 
   const { patient, patientRecord, analyses, recommendations, appointments, prescriptions, notes, documents = [], carePlanTasks = [] } = data
 
-  const timeline: Array<{ ts: number; kind: string; title: string; meta?: string }> = []
+  const timeline: Array<{ ts: number; kind: string; title: string; meta?: string; ref?: { type: 'document' | 'analysis'; id: string } }> = []
   for (const a of Array.isArray(appointments) ? appointments : []) {
     const ts = new Date(a.scheduledAt).getTime()
     if (!Number.isFinite(ts)) continue
@@ -119,7 +119,8 @@ export default function PatientCardPage() {
       ts,
       kind: 'analysis',
       title: `Анализ: ${an.title || an.type || '—'}`,
-      meta: `${new Date(an.date).toLocaleDateString('ru-RU')} • ${an.status}`
+      meta: `${new Date(an.date).toLocaleDateString('ru-RU')} • ${an.status}`,
+      ref: { type: 'analysis', id: an.id }
     })
   }
   for (const d of Array.isArray(documents) ? documents : []) {
@@ -129,7 +130,8 @@ export default function PatientCardPage() {
       ts,
       kind: 'document',
       title: `Документ: ${d.fileName || '—'}`,
-      meta: `${new Date(d.uploadDate).toLocaleDateString('ru-RU')} • ${d.studyType || d.category || ''}`.trim()
+      meta: `${new Date(d.uploadDate).toLocaleDateString('ru-RU')} • ${d.studyType || d.category || ''}`.trim(),
+      ref: { type: 'document', id: d.id }
     })
   }
   for (const t of Array.isArray(carePlanTasks) ? carePlanTasks : []) {
@@ -303,7 +305,17 @@ export default function PatientCardPage() {
                   {timelineShown.map((e, idx) => (
                     <div key={`${e.kind}-${e.ts}-${idx}`} className="p-3 rounded-lg bg-white/70 border flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-medium">{e.title}</div>
+                        <div className="text-sm font-medium">
+                          {e.ref?.type === 'document' ? (
+                            <Link href={`/doctor/documents/${e.ref.id}`} className="text-primary hover:underline">
+                              {e.title}
+                            </Link>
+                          ) : e.ref?.type === 'analysis' ? (
+                            <span>{e.title}</span>
+                          ) : (
+                            <span>{e.title}</span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">{e.meta}</div>
                       </div>
                       <Badge variant="outline">{e.kind}</Badge>
