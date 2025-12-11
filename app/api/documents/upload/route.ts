@@ -476,7 +476,7 @@ async function generateRemindersFromAnalysis(analysis: any, indicators: any[]) {
     description: `Рекомендуется консультация специалиста по результатам анализа "${analysis.title}". Обнаружены отклонения по показателям: ${abnormalIndicators.map(ind => ind.name).join(', ')}.`,
     dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // через неделю
     recurrence: 'NONE' as const,
-    channels: JSON.stringify(['EMAIL', 'PUSH'])
+    channels: ['EMAIL', 'PUSH']
   }
   await prisma.reminder.create({ data: doctorReminder })
 
@@ -498,7 +498,7 @@ async function generateRemindersFromAnalysis(analysis: any, indicators: any[]) {
           description: 'Согласно результатам анализа крови, рекомендуется прием препаратов железа для повышения гемоглобина. Проконсультируйтесь с врачом о дозировке.',
           dueAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // через 2 дня
           recurrence: 'DAILY' as const,
-          channels: JSON.stringify(['PUSH'])
+          channels: ['PUSH']
         }
       })
     }
@@ -512,7 +512,7 @@ async function generateRemindersFromAnalysis(analysis: any, indicators: any[]) {
           description: 'Обнаружен повышенный уровень холестерина. Рекомендуется диета с ограничением жирной пищи и регулярный контроль показателей.',
           dueAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // через 3 дня
           recurrence: 'WEEKLY' as const,
-          channels: JSON.stringify(['EMAIL', 'PUSH'])
+          channels: ['EMAIL', 'PUSH']
         }
       })
     }
@@ -527,7 +527,7 @@ async function generateRemindersFromAnalysis(analysis: any, indicators: any[]) {
       description: `Рекомендуется повторный анализ "${analysis.title}" через 1-3 месяца для контроля динамики показателей.`,
       dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // через месяц
       recurrence: 'NONE' as const,
-      channels: JSON.stringify(['EMAIL', 'PUSH'])
+      channels: ['EMAIL', 'PUSH']
     }
   })
 

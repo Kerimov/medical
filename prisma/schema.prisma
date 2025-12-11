@@ -30,6 +30,7 @@ model User {
   patientRecords PatientRecord[]
   healthDiaryEntries HealthDiaryEntry[]
   diaryTags         DiaryTag[]
+  patientMedications PatientMedication[]
 }
 
 model DoctorProfile {
@@ -104,6 +105,27 @@ model Prescription {
   isActive        Boolean  @default(true)
   prescribedAt    DateTime @default(now())
   expiresAt       DateTime?
+}
+
+/// Пользовательские лекарства/БАДы (вводит сам пациент)
+model PatientMedication {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  dosage        String?
+  form          String?  // таблетка/капсула/сироп и т.п.
+  route         String?  // per os / ингаляция и т.п.
+  frequencyPerDay Int?   // 1..6 (если известно)
+  times         Json?    // ["08:00","20:00"]
+  startDate     DateTime?
+  endDate       DateTime?
+  notes         String?
+  isSupplement  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Appointment {

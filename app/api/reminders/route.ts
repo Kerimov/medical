@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         description,
         dueAt: new Date(dueAt),
         recurrence,
-        channels: JSON.stringify(channels),
+        channels,
         analysisId,
         documentId
       }

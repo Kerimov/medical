@@ -87,7 +87,7 @@ export async function PUT(
     if (description !== undefined) updateData.description = description
     if (dueAt !== undefined) updateData.dueAt = new Date(dueAt)
     if (recurrence !== undefined) updateData.recurrence = recurrence
-    if (channels !== undefined) updateData.channels = JSON.stringify(channels)
+    if (channels !== undefined) updateData.channels = channels
 
     const reminder = await prisma.reminder.update({
       where: { id: params.id },

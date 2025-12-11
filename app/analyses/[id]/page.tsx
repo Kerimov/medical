@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Calendar, MapPin, User, FileText, Edit, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, User, FileText, Edit, Trash2, ShieldAlert, Sparkles, Bell } from 'lucide-react'
 import Link from 'next/link'
 
 interface AnalysisResult {
@@ -30,6 +30,7 @@ interface Analysis {
   notes?: string
   createdAt: string
   updatedAt: string
+  documentId?: string
 }
 
 export default function AnalysisDetailPage() {
@@ -43,12 +44,25 @@ export default function AnalysisDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<string | null>(null)
   const [generatingReminders, setGeneratingReminders] = useState(false)
+  const [riskLoading, setRiskLoading] = useState(false)
+  const [risk, setRisk] = useState<{ level: 'ok' | 'attention' | 'urgent'; confidence: number; reasons: string[]; redFlags: string[]; nextSteps: string[] } | null>(null)
+  const [planLoading, setPlanLoading] = useState(false)
+  const [planResult, setPlanResult] = useState<{ message: string; reminders: any[] } | null>(null)
+  const [doctorReportLoading, setDoctorReportLoading] = useState(false)
+  const [doctorReportDocId, setDoctorReportDocId] = useState<string | null>(null)
 
   useEffect(() => {
     if (token && params.id) {
       fetchAnalysis()
     }
   }, [token, params.id])
+
+  useEffect(() => {
+    if (!analysis || !token) return
+    // обновляем triage при смене анализа
+    void fetchRisk()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis?.id])
 
   const fetchAnalysis = async () => {
     try {
@@ -72,6 +86,29 @@ export default function AnalysisDetailPage() {
       setError(err instanceof Error ? err.message : 'Произошла ошибка')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRisk = async () => {
+    if (!analysis || !token) return
+    try {
+      setRiskLoading(true)
+      const res = await fetch('/api/ai/risk-triage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ analysisId: analysis.id, symptoms: '' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Ошибка триажа')
+      setRisk(data)
+    } catch (e) {
+      // не блокируем страницу, просто не покажем triage
+      setRisk(null)
+    } finally {
+      setRiskLoading(false)
     }
   }
 
@@ -151,6 +188,64 @@ export default function AnalysisDetailPage() {
     }
   }
 
+  const handleGenerateCarePlan = async () => {
+    if (!analysis || !token) return
+    try {
+      setPlanLoading(true)
+      setError(null)
+      setPlanResult(null)
+      const res = await fetch('/api/ai/care-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          analysisId: analysis.id,
+          goal: ''
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Ошибка формирования плана')
+      setPlanResult({ message: data?.message || 'План создан', reminders: data?.reminders || [] })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Ошибка'
+      setError(msg)
+    } finally {
+      setPlanLoading(false)
+    }
+  }
+
+  const handleGenerateDoctorReport = async () => {
+    if (!analysis || !token) return
+    try {
+      setDoctorReportLoading(true)
+      setError(null)
+      setDoctorReportDocId(null)
+      const res = await fetch('/api/reports/doctor-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          analysisId: analysis.id,
+          days: 180,
+          complaints: '',
+          medications: ''
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Ошибка формирования отчёта')
+      setDoctorReportDocId(data?.documentId || null)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Ошибка'
+      setError(msg)
+    } finally {
+      setDoctorReportLoading(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'normal':
@@ -175,6 +270,19 @@ export default function AnalysisDetailPage() {
       default:
         return status
     }
+  }
+
+  const getRiskBadge = () => {
+    // fallback по status, если triage не готов
+    const level = risk?.level || (analysis?.status === 'critical' ? 'urgent' : analysis?.status === 'abnormal' ? 'attention' : 'ok')
+    const label = level === 'urgent' ? 'Срочно' : level === 'attention' ? 'Внимание' : 'Ок'
+    const cls =
+      level === 'urgent'
+        ? 'bg-red-100 text-red-800'
+        : level === 'attention'
+          ? 'bg-yellow-100 text-yellow-800'
+          : 'bg-green-100 text-green-800'
+    return <Badge className={cls}>{label}</Badge>
   }
 
   const formatDate = (dateString: string) => {
@@ -277,6 +385,14 @@ export default function AnalysisDetailPage() {
           <Button size="sm" onClick={handleGenerate} disabled={generating}>
             {generating ? 'Генерация...' : 'Сгенерировать комментарии'}
           </Button>
+          <Button size="sm" onClick={handleGenerateCarePlan} disabled={planLoading} className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            {planLoading ? 'План...' : 'Сформировать план'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleGenerateDoctorReport} disabled={doctorReportLoading} className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            {doctorReportLoading ? 'Отчёт...' : 'Сформировать для врача'}
+          </Button>
           <Button 
             size="sm" 
             variant="outline" 
@@ -340,6 +456,16 @@ export default function AnalysisDetailPage() {
                     {getStatusText(analysis.status)}
                   </Badge>
                 </div>
+
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium">Риск:</span>
+                  {getRiskBadge()}
+                  {riskLoading && <span className="text-xs text-muted-foreground">оценка...</span>}
+                  {risk?.confidence !== undefined && (
+                    <span className="text-xs text-muted-foreground">уверенность {risk.confidence}%</span>
+                  )}
+                </div>
                 
                 {analysis.normalRange && (
                   <div>
@@ -351,6 +477,99 @@ export default function AnalysisDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Триаж: причины/красные флаги */}
+        {risk && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Сигналы риска и триаж
+              </CardTitle>
+              <CardDescription>Классификация: {risk.level}. Это не диагноз, а подсказка по приоритету.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div>
+                  <div className="font-medium mb-2">Почему так</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {(risk.reasons || []).slice(0, 6).map((x, idx) => (
+                      <li key={idx}>{x}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-medium mb-2">Когда срочно</div>
+                  {risk.redFlags?.length ? (
+                    <ul className="list-disc pl-5 space-y-1">
+                      {risk.redFlags.slice(0, 6).map((x, idx) => (
+                        <li key={idx} className="text-red-700">{x}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted-foreground">Нет явных красных флагов по имеющимся данным.</p>
+                  )}
+                </div>
+              </div>
+              {risk.nextSteps?.length ? (
+                <div className="mt-4">
+                  <div className="font-medium mb-2">Что делать дальше</div>
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
+                    {risk.nextSteps.slice(0, 6).map((x, idx) => (
+                      <li key={idx}>{x}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* План действий -> напоминания */}
+        {planResult && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                План действий → Напоминания
+              </CardTitle>
+              <CardDescription>{planResult.message}. Управление — в разделе <Link href="/reminders" className="text-primary hover:underline">Напоминания</Link>.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {Array.isArray(planResult.reminders) && planResult.reminders.length > 0 ? (
+                <div className="space-y-2">
+                  {planResult.reminders.slice(0, 7).map((r: any) => (
+                    <div key={r.id || r.title} className="p-3 border rounded-md">
+                      <div className="font-medium">{r.title}</div>
+                      {r.description ? <div className="text-sm text-muted-foreground whitespace-pre-wrap">{r.description}</div> : null}
+                      {r.dueAt ? <div className="text-xs text-muted-foreground mt-1">Срок: {new Date(r.dueAt).toLocaleDateString('ru-RU')}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">План сформирован, но напоминания не созданы (проверьте данные и попробуйте снова).</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Отчёт для врача */}
+        {doctorReportDocId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Отчёт для врача готов
+              </CardTitle>
+              <CardDescription>Откройте и скачайте/распечатайте перед приёмом.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href={`/documents/${doctorReportDocId}`} className="text-primary hover:underline">
+                Открыть отчёт
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Результаты анализов */}
         {(() => {

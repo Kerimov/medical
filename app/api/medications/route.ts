@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { verifyToken } from '@/lib/auth'
+
+export const dynamic = 'force-dynamic'
+
+function getToken(req: NextRequest) {
+  return req.headers.get('Authorization')?.replace('Bearer ', '') || null
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const token = getToken(req)
+    if (!token) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    const decoded = verifyToken(token)
+    if (!decoded?.userId) return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
+
+    const list = await prisma.patientMedication.findMany({
+      where: { userId: decoded.userId },
+      orderBy: { createdAt: 'desc' }
+    })
+    return NextResponse.json({ medications: list })
+  } catch (e) {
+    console.error('[medications][GET] error:', e)
+    return NextResponse.json({ error: 'Ошибка получения лекарств' }, { status: 500 })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const token = getToken(req)
+    if (!token) return NextResponse.json({ error: 'Не авторизован' }, { status: 401 })
+    const decoded = verifyToken(token)
+    if (!decoded?.userId) return NextResponse.json({ error: 'Недействительный токен' }, { status: 401 })
+
+    const body = await req.json().catch(() => ({}))
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    if (!name) return NextResponse.json({ error: 'name обязателен' }, { status: 400 })
+
+    const times =
+      Array.isArray(body?.times)
+        ? body.times
+        : typeof body?.times === 'string'
+          ? body.times.split(',').map((s: string) => s.trim()).filter(Boolean)
+          : undefined
+
+    const created = await prisma.patientMedication.create({
+      data: {
+        userId: decoded.userId,
+        name,
+        dosage: typeof body?.dosage === 'string' ? body.dosage : null,
+        form: typeof body?.form === 'string' ? body.form : null,
+        route: typeof body?.route === 'string' ? body.route : null,
+        frequencyPerDay: typeof body?.frequencyPerDay === 'number' ? Math.max(1, Math.min(6, Math.floor(body.frequencyPerDay))) : null,
+        times: times && times.length ? times : null,
+        startDate: body?.startDate ? new Date(body.startDate) : null,
+        endDate: body?.endDate ? new Date(body.endDate) : null,
+        notes: typeof body?.notes === 'string' ? body.notes : null,
+        isSupplement: !!body?.isSupplement
+      }
+    })
+    return NextResponse.json({ medication: created }, { status: 201 })
+  } catch (e) {
+    console.error('[medications][POST] error:', e)
+    return NextResponse.json({ error: 'Ошибка создания лекарства' }, { status: 500 })
+  }
+}
+
+

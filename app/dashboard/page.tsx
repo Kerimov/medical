@@ -16,7 +16,8 @@ import {
   TrendingUp,
   User,
   Clock,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [manualPulse, setManualPulse] = useState<string>('')
   const [journalCount, setJournalCount] = useState<number>(0)
+  const [latestAnalysis, setLatestAnalysis] = useState<any | null>(null)
   const isAdmin = !!(user && user.role === 'ADMIN')
   const displayFirstName = (() => {
     const fullName = user?.name?.trim() ?? ''
@@ -93,6 +95,16 @@ export default function DashboardPage() {
           setJournalCount(Array.isArray(docs) ? docs.length : (docs?.documents?.length || 0))
         }
 
+        const analysesRes = await fetch('/api/analyses', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
+        })
+        if (analysesRes.ok) {
+          const data = await analysesRes.json()
+          const list = Array.isArray(data?.analyses) ? data.analyses : []
+          const sorted = list.slice().sort((a: any, b: any) => +new Date(b.date) - +new Date(a.date))
+          setLatestAnalysis(sorted[0] || null)
+        }
+
         setTodayMedicationsProgress('3/5')
       } catch {
         // игнорируем ошибки отображения
@@ -100,6 +112,13 @@ export default function DashboardPage() {
     }
     load()
   }, [user])
+
+  const getRiskFromStatus = (status: string): { label: string; cls: string } => {
+    const s = (status || '').toLowerCase()
+    if (s === 'critical') return { label: 'Срочно', cls: 'bg-red-100 text-red-800' }
+    if (s === 'abnormal') return { label: 'Внимание', cls: 'bg-yellow-100 text-yellow-800' }
+    return { label: 'Ок', cls: 'bg-green-100 text-green-800' }
+  }
 
   if (isLoading) {
     return (
@@ -197,6 +216,43 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Последний анализ + риск */}
+          <Card className="lg:col-span-1">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold">Последний анализ</CardTitle>
+                <Link href="/analyses" className="text-xs text-muted-foreground hover:text-foreground">
+                  Все →
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!latestAnalysis ? (
+                <div className="text-sm text-muted-foreground">Нет анализов</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-medium">{latestAnalysis.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(latestAnalysis.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+                      <span className={`text-xs px-2 py-1 rounded ${getRiskFromStatus(latestAnalysis.status).cls}`}>
+                        {getRiskFromStatus(latestAnalysis.status).label}
+                      </span>
+                    </div>
+                  </div>
+                  <Link href={`/analyses/${latestAnalysis.id}`} className="inline-flex items-center text-sm text-primary hover:underline">
+                    Открыть <ChevronRight className="h-4 w-4 ml-1" />
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Ближайшие приемы */}
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">

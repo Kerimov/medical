@@ -38,6 +38,7 @@ interface Document {
   fileUrl: string
   uploadDate: string
   parsed: boolean
+  category?: string
   studyType?: string
   studyDate?: string
   laboratory?: string
@@ -62,6 +63,24 @@ export default function DocumentViewPage() {
   const params = useParams()
   const [document, setDocument] = useState<Document | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showFixMode, setShowFixMode] = useState(false)
+  const [fixSaving, setFixSaving] = useState(false)
+  const [fixError, setFixError] = useState<string | null>(null)
+  const [fixEdits, setFixEdits] = useState<{
+    studyType?: string
+    studyDate?: string
+    laboratory?: string
+    doctor?: string
+    findings?: string
+    indicators?: Array<{
+      name: string
+      value?: string
+      unit?: string
+      referenceMin?: string
+      referenceMax?: string
+      isNormal?: boolean | null
+    }>
+  }>({})
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -96,6 +115,52 @@ export default function DocumentViewPage() {
   }
 
   if (!document) return null
+
+  const isDoctorReport =
+    document.fileType.includes('markdown') ||
+    document.studyType?.toLowerCase().includes('отчёт') ||
+    document.category === 'medical_report'
+
+  // --- режим исправления (MVP) ---
+  const parseNum = (v: any) => {
+    if (v === null || v === undefined) return null
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string') {
+      const n = Number(v.replace(',', '.').replace(/[^\d.-]/g, ''))
+      return Number.isFinite(n) ? n : null
+    }
+    return null
+  }
+
+  const issues: Array<{ key: string; title: string; hint: string }> = []
+  if (!document.studyType) issues.push({ key: 'studyType', title: 'Тип исследования не распознан', hint: 'Например: "Клинический анализ крови"' })
+  if (!document.studyDate) issues.push({ key: 'studyDate', title: 'Дата исследования не распознана', hint: 'Выберите дату исследования' })
+  if (!document.laboratory) issues.push({ key: 'laboratory', title: 'Лаборатория не распознана', hint: 'Например: "Инвитро"' })
+
+  const indicatorIssues: any[] = []
+  if (Array.isArray(document.indicators)) {
+    for (const i of document.indicators) {
+      const name = (i?.name || '').toString()
+      if (!name) continue
+      const valueNum = parseNum(i?.value)
+      const unit = (i?.unit || '').toString().trim()
+      const refMin = i?.referenceMin
+      const refMax = i?.referenceMax
+      const badValue = valueNum === null
+      const missingUnit = !unit
+      const missingRef = refMin === undefined || refMax === undefined || refMin === null || refMax === null
+      if (badValue || missingUnit || missingRef) {
+        indicatorIssues.push({
+          name,
+          badValue,
+          missingUnit,
+          missingRef
+        })
+      }
+    }
+  }
+
+  const topIndicatorIssues = indicatorIssues.slice(0, 5)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10">
@@ -241,6 +306,172 @@ export default function DocumentViewPage() {
             </CardContent>
           </Card>
 
+          {/* Режим исправления (MVP) */}
+          {!isDoctorReport && (issues.length > 0 || topIndicatorIssues.length > 0) && (
+            <Card className="border-2 border-orange-200 bg-orange-50/40">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Режим исправления</CardTitle>
+                    <CardDescription>
+                      Мы нашли несколько полей, которые стоит подтвердить, чтобы анализы/динамика/ИИ работали точнее.
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" onClick={() => setShowFixMode(v => !v)}>
+                    {showFixMode ? 'Скрыть' : 'Исправить'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showFixMode && (
+                <CardContent className="space-y-4">
+                  {fixError && (
+                    <div className="text-sm text-destructive">{fixError}</div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Тип исследования</div>
+                      <Input
+                        value={fixEdits.studyType ?? (document.studyType || '')}
+                        onChange={(e) => setFixEdits((p) => ({ ...p, studyType: e.target.value }))}
+                        placeholder="Напр. Клинический анализ крови"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Дата исследования</div>
+                      <Input
+                        type="date"
+                        value={fixEdits.studyDate ?? (document.studyDate ? new Date(document.studyDate).toISOString().slice(0, 10) : '')}
+                        onChange={(e) => setFixEdits((p) => ({ ...p, studyDate: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Лаборатория</div>
+                      <Input
+                        value={fixEdits.laboratory ?? (document.laboratory || '')}
+                        onChange={(e) => setFixEdits((p) => ({ ...p, laboratory: e.target.value }))}
+                        placeholder="Напр. Инвитро"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Врач (если есть)</div>
+                      <Input
+                        value={fixEdits.doctor ?? (document.doctor || '')}
+                        onChange={(e) => setFixEdits((p) => ({ ...p, doctor: e.target.value }))}
+                        placeholder="ФИО врача"
+                      />
+                    </div>
+                  </div>
+
+                  {topIndicatorIssues.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium mb-2">Спорные показатели (до 5)</div>
+                      <div className="space-y-2">
+                        {topIndicatorIssues.map((x: any) => {
+                          const current = (document.indicators || []).find((i) => i.name === x.name)
+                          const idx = (fixEdits.indicators || []).findIndex((i) => i.name === x.name)
+                          const existing = idx >= 0 ? (fixEdits.indicators || [])[idx] : null
+                          const setRow = (patch: any) => {
+                            setFixEdits((prev) => {
+                              const list = Array.isArray(prev.indicators) ? prev.indicators.slice() : []
+                              const pos = list.findIndex((i) => i.name === x.name)
+                              const base = pos >= 0 ? list[pos] : { name: x.name }
+                              const next = { ...base, ...patch }
+                              if (pos >= 0) list[pos] = next
+                              else list.push(next)
+                              return { ...prev, indicators: list }
+                            })
+                          }
+                          return (
+                            <div key={x.name} className="p-3 border rounded-md bg-white/60">
+                              <div className="text-sm font-medium">{x.name}</div>
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-2">
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Значение</div>
+                                  <Input
+                                    value={existing?.value ?? String(current?.value ?? '')}
+                                    onChange={(e) => setRow({ value: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Ед.</div>
+                                  <Input
+                                    value={existing?.unit ?? String(current?.unit ?? '')}
+                                    onChange={(e) => setRow({ unit: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Норма min</div>
+                                  <Input
+                                    value={existing?.referenceMin ?? (current?.referenceMin ?? '')?.toString()}
+                                    onChange={(e) => setRow({ referenceMin: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-xs text-muted-foreground mb-1">Норма max</div>
+                                  <Input
+                                    value={existing?.referenceMax ?? (current?.referenceMax ?? '')?.toString()}
+                                    onChange={(e) => setRow({ referenceMax: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={fixSaving}
+                      onClick={async () => {
+                        try {
+                          setFixSaving(true)
+                          setFixError(null)
+                          const indicatorPatch = (fixEdits.indicators || []).map((i) => ({
+                            name: i.name,
+                            value: i.value ?? undefined,
+                            unit: i.unit ?? undefined,
+                            referenceMin: i.referenceMin ? Number(i.referenceMin.replace(',', '.')) : null,
+                            referenceMax: i.referenceMax ? Number(i.referenceMax.replace(',', '.')) : null,
+                            isNormal: i.isNormal ?? undefined
+                          }))
+                          const res = await fetch(`/api/documents/${document.id}/review`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              patch: {
+                                studyType: fixEdits.studyType,
+                                studyDate: fixEdits.studyDate,
+                                laboratory: fixEdits.laboratory,
+                                doctor: fixEdits.doctor,
+                                indicators: indicatorPatch
+                              }
+                            })
+                          })
+                          const data = await res.json()
+                          if (!res.ok) throw new Error(data?.error || 'Ошибка сохранения')
+                          setDocument(data.document)
+                          setShowFixMode(false)
+                        } catch (e) {
+                          setFixError(e instanceof Error ? e.message : 'Ошибка')
+                        } finally {
+                          setFixSaving(false)
+                        }
+                      }}
+                    >
+                      {fixSaving ? 'Сохранение...' : 'Сохранить исправления'}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setFixEdits({}); setFixError(null) }}>
+                      Сбросить
+                    </Button>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
           {/* Indicators */}
           {document.indicators && document.indicators.length > 0 && (
             <Card>
@@ -318,16 +549,22 @@ export default function DocumentViewPage() {
           {document.findings && (
             <Card>
               <CardHeader>
-                <CardTitle>Заключение</CardTitle>
+                <CardTitle>{isDoctorReport ? 'Отчёт' : 'Заключение'}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{document.findings}</p>
+                {isDoctorReport ? (
+                  <pre className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-lg max-h-[70vh] overflow-y-auto">
+                    {document.findings}
+                  </pre>
+                ) : (
+                  <p className="text-muted-foreground">{document.findings}</p>
+                )}
               </CardContent>
             </Card>
           )}
 
           {/* Parsed Data Table */}
-          {document.rawText && (
+          {document.rawText && !isDoctorReport && (
             <Card>
               <CardHeader>
                 <CardTitle>Данные документа</CardTitle>
@@ -463,6 +700,17 @@ export default function DocumentViewPage() {
                 Скачать
               </Button>
             </a>
+            {isDoctorReport && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  try { window.print() } catch {}
+                }}
+              >
+                Печать
+              </Button>
+            )}
             <Link href="/documents" className="flex-1">
               <Button variant="outline" className="w-full">
                 Закрыть

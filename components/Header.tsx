@@ -64,6 +64,7 @@ export function Header() {
                 <>
                   <Link href="/documents" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Документы</Link>
                   <Link href="/analyses" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Анализы</Link>
+                  <Link href="/medications" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary">Лекарства</Link>
                   <Link href="/knowledge-base" className="px-3 py-2 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-1">
                     <BookOpen className="h-4 w-4" />
                     База знаний
@@ -159,6 +160,7 @@ export function Header() {
                   <>
                     <Link href="/documents" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Документы</Link>
                     <Link href="/analyses" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Анализы</Link>
+                    <Link href="/medications" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary" onClick={() => setMobileMenuOpen(false)}>Лекарства</Link>
                     <Link href="/knowledge-base" className="px-4 py-3 rounded-lg transition-all hover:bg-primary/10 hover:text-primary flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                       <BookOpen className="h-4 w-4" />
                       База знаний

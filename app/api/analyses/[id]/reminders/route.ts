@@ -93,7 +93,7 @@ export async function POST(
             description: reminderData.description,
             dueAt: reminderData.dueAt,
             recurrence: reminderData.recurrence,
-            channels: JSON.stringify(reminderData.channels)
+            channels: reminderData.channels
           }
         })
         createdReminders.push(reminder)

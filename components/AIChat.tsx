@@ -15,6 +15,13 @@ interface Message {
   attachedDocuments?: AttachedDocument[]
   functionResult?: any
   functionName?: string
+  sources?: Array<{
+    sourceType?: string
+    id?: string
+    label?: string
+    date?: string | null
+    url?: string | null
+  }>
 }
 
 interface AttachedDocument {
@@ -119,7 +126,8 @@ export function AIChat() {
         body: JSON.stringify({
           message: userMessage.content,
           history: messages,
-          documentIds: selectedDocuments // Отправляем ID документов
+          documentIds: selectedDocuments, // опционально: уточнить источники
+          ragScope: 'all' // RAG по всем данным пользователя: документы + анализы + дневник + база знаний
         })
       })
 
@@ -132,7 +140,8 @@ export function AIChat() {
           content: data.response,
           timestamp: new Date(),
           functionResult: data.functionResult,
-          functionName: data.functionName
+          functionName: data.functionName,
+          sources: Array.isArray(data.sources) ? data.sources : undefined
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {
@@ -294,6 +303,26 @@ export function AIChat() {
                         Показано {message.functionResult.length} записей.
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Источники (RAG) */}
+                {message.role === 'assistant' && Array.isArray(message.sources) && message.sources.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {message.sources.slice(0, 6).map((s, idx) => {
+                      const label = (s.label || s.sourceType || `SOURCE ${idx + 1}`).toString()
+                      return s.url ? (
+                        <a key={`${s.id || idx}`} href={s.url} className="text-xs">
+                          <Badge variant="outline" className="text-xs hover:bg-muted">
+                            {label}
+                          </Badge>
+                        </a>
+                      ) : (
+                        <Badge key={`${s.id || idx}`} variant="outline" className="text-xs">
+                          {label}
+                        </Badge>
+                      )
+                    })}
                   </div>
                 )}
                 

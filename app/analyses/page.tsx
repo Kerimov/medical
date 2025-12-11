@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Plus, Calendar, MapPin, User, FileText, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Plus, Calendar, MapPin, User, FileText, Search, Filter, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus, Sparkles, Bell } from 'lucide-react'
 import Link from 'next/link'
 
 interface AnalysisResult {
@@ -40,6 +40,50 @@ interface AnalysisCategory {
   analyses: Analysis[]
 }
 
+type IndicatorPoint = {
+  analysisId: string
+  documentId?: string
+  date: string
+  title: string
+  value: number
+  unit?: string
+  isNormal?: boolean | null
+}
+
+type AiTrendResult = {
+  tldr: string
+  whatChanged: string[]
+  possibleCauses: Array<{ cause: string; why?: string; likelihood?: 'low' | 'medium' | 'high' | string }>
+  confidence: number
+  redFlags: string[]
+  nextSteps: string[]
+  questionsToRefine: string[]
+}
+
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const v = Number(value.replace(',', '.').replace(/[^\d.-]/g, ''))
+    return Number.isFinite(v) ? v : null
+  }
+  return null
+}
+
+function sparklinePath(values: number[], width = 140, height = 36) {
+  if (values.length === 0) return ''
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const step = values.length === 1 ? 0 : width / (values.length - 1)
+  const points = values.map((v, idx) => {
+    const x = idx * step
+    const y = height - ((v - min) / range) * height
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  })
+  return `M ${points.join(' L ')}`
+}
+
 export default function AnalysesPage() {
   const { user, token } = useAuth()
   const [analyses, setAnalyses] = useState<Analysis[]>([])
@@ -48,6 +92,11 @@ export default function AnalysesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [selectedIndicator, setSelectedIndicator] = useState<string>('')
+  const [aiTrend, setAiTrend] = useState<AiTrendResult | null>(null)
+  const [aiTrendRaw, setAiTrendRaw] = useState<string | null>(null)
+  const [aiPlanText, setAiPlanText] = useState<string | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -258,6 +307,117 @@ export default function AnalysesPage() {
     }
   }
 
+  const indicatorSeries = useMemo(() => {
+    const map: Record<string, IndicatorPoint[]> = {}
+    for (const a of analyses) {
+      const parsed = parseAnalysisResults(a.results)
+      for (const [name, obj] of Object.entries(parsed || {})) {
+        const num = toNumber(obj?.value)
+        if (num === null) continue
+        if (!map[name]) map[name] = []
+        map[name].push({
+          analysisId: a.id,
+          documentId: a.documentId,
+          date: a.date,
+          title: a.title,
+          value: num,
+          unit: obj?.unit,
+          isNormal: typeof obj?.normal === 'boolean' ? obj.normal : null
+        })
+      }
+    }
+    for (const key of Object.keys(map)) {
+      map[key].sort((x, y) => new Date(x.date).getTime() - new Date(y.date).getTime())
+    }
+    return map
+  }, [analyses])
+
+  const indicatorNames = useMemo(() => Object.keys(indicatorSeries).sort((a, b) => a.localeCompare(b, 'ru')), [indicatorSeries])
+
+  useEffect(() => {
+    if (!selectedIndicator && indicatorNames.length > 0) {
+      setSelectedIndicator(indicatorNames[0])
+    }
+  }, [indicatorNames, selectedIndicator])
+
+  const selectedSeries = selectedIndicator ? indicatorSeries[selectedIndicator] || [] : []
+  const selectedValues = selectedSeries.map(p => p.value)
+  const trendDelta = selectedValues.length >= 2 ? selectedValues[selectedValues.length - 1] - selectedValues[selectedValues.length - 2] : 0
+  const trendLabel = selectedValues.length < 2 ? '—' : trendDelta > 0 ? 'Рост' : trendDelta < 0 ? 'Снижение' : 'Без изменений'
+
+  const callAI = async (mode: 'trend' | 'plan') => {
+    if (!selectedIndicator || selectedSeries.length === 0) return
+    setAiBusy(true)
+    if (mode === 'trend') {
+      setAiTrend(null)
+      setAiTrendRaw(null)
+    }
+    if (mode === 'plan') setAiPlanText(null)
+    try {
+      // берем до 5 последних документов из серии (если есть)
+      const docIds = Array.from(
+        new Set(
+          selectedSeries
+            .map((p) => p.documentId)
+            .filter((x): x is string => typeof x === 'string' && x.length > 0)
+            .slice(-5)
+        )
+      )
+
+      if (mode === 'trend') {
+        const res = await fetch('/api/ai/analysis-trend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            indicatorName: selectedIndicator,
+            series: selectedSeries.slice(-12).map((p) => ({
+              date: p.date,
+              value: p.value,
+              unit: p.unit,
+              isNormal: p.isNormal,
+              title: p.title
+            }))
+          })
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error || 'Ошибка AI')
+
+        if (data?.result && typeof data.result === 'object') {
+          setAiTrend(data.result as AiTrendResult)
+          if (typeof data?.raw === 'string') setAiTrendRaw(data.raw)
+        } else {
+          setAiTrendRaw(typeof data?.response === 'string' ? data.response : JSON.stringify(data))
+        }
+      }
+
+      if (mode === 'plan') {
+        const prompt = `Составь план действий по моим документам и СОЗДАЙ напоминания.\nПлан должен быть на 2–4 недели, 3–7 пунктов.\nУчитывай показатель "${selectedIndicator}" и его динамику.\nВключи контрольные сроки/повторный анализ/консультацию (если нужно).`
+        const res = await fetch('/api/ai/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            message: prompt,
+            history: [],
+            documentIds: docIds
+          })
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error || 'Ошибка AI')
+        setAiPlanText(data?.response || '')
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Ошибка'
+      if (mode === 'trend') setAiTrendRaw(`Ошибка: ${msg}`)
+      if (mode === 'plan') setAiPlanText(`Ошибка: ${msg}`)
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   if (!user) {
     return (
       <div className="container mx-auto py-8">
@@ -309,6 +469,193 @@ export default function AnalysesPage() {
               </Button>
             </Link>
       </div>
+
+      {/* Динамика показателей + AI */}
+      {indicatorNames.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Динамика показателей
+            </CardTitle>
+            <CardDescription>Выберите показатель — увидите изменения по времени и получите AI‑интерпретацию.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col lg:flex-row gap-4 lg:items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-1">Показатель</label>
+                <select
+                  value={selectedIndicator}
+                  onChange={(e) => setSelectedIndicator(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {indicatorNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={aiBusy}
+                  onClick={() => callAI('trend')}
+                  className="flex items-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  ИИ‑интерпретация
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={aiBusy}
+                  onClick={() => callAI('plan')}
+                  className="flex items-center gap-2"
+                >
+                  <Bell className="h-4 w-4" />
+                  План → Напоминания
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card className="lg:col-span-1">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Последнее значение</p>
+                      <p className="text-2xl font-semibold">
+                        {selectedSeries.length > 0 ? selectedSeries[selectedSeries.length - 1].value : '—'}
+                        {selectedSeries.length > 0 && selectedSeries[selectedSeries.length - 1].unit ? ` ${selectedSeries[selectedSeries.length - 1].unit}` : ''}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Тренд: {trendLabel}</p>
+                    </div>
+                    <svg width="140" height="36" viewBox="0 0 140 36" className="text-primary">
+                      <path d={sparklinePath(selectedValues, 140, 36)} fill="none" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardContent className="pt-6">
+                  <div className="text-sm font-medium mb-2">История значений</div>
+                  <div className="max-h-56 overflow-auto border rounded-md">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2">Дата</th>
+                          <th className="text-left px-3 py-2">Значение</th>
+                          <th className="text-left px-3 py-2">Документ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedSeries.slice().reverse().map((p) => (
+                          <tr key={`${p.analysisId}-${p.date}`} className="border-t">
+                            <td className="px-3 py-2">{formatDate(p.date)}</td>
+                            <td className={`px-3 py-2 ${p.isNormal === false ? 'text-red-600 font-medium' : ''}`}>
+                              {p.value} {p.unit || ''}
+                            </td>
+                            <td className="px-3 py-2 text-muted-foreground">{p.title}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {(aiTrend || aiTrendRaw || aiPlanText) && (
+              <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {(aiTrend || aiTrendRaw) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        ИИ‑интерпретация динамики
+                        {aiTrend?.confidence !== undefined && (
+                          <Badge variant="secondary">Уверенность: {aiTrend.confidence}%</Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {aiTrend ? (
+                        <div className="space-y-3 text-sm">
+                          <div className="whitespace-pre-wrap">{aiTrend.tldr}</div>
+                          {aiTrend.whatChanged?.length > 0 && (
+                            <div>
+                              <div className="font-medium mb-1">Что изменилось</div>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {aiTrend.whatChanged.slice(0, 5).map((x, idx) => (
+                                  <li key={idx}>{x}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {aiTrend.possibleCauses?.length > 0 && (
+                            <div>
+                              <div className="font-medium mb-1">Возможные причины</div>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {aiTrend.possibleCauses.slice(0, 5).map((c, idx) => (
+                                  <li key={idx}>
+                                    {c.cause}
+                                    {c.likelihood ? ` (${c.likelihood})` : ''}
+                                    {c.why ? ` — ${c.why}` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {aiTrend.nextSteps?.length > 0 && (
+                            <div>
+                              <div className="font-medium mb-1">Что делать дальше</div>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {aiTrend.nextSteps.slice(0, 6).map((x, idx) => (
+                                  <li key={idx}>{x}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {aiTrend.questionsToRefine?.length > 0 && (
+                            <div className="text-muted-foreground">
+                              <div className="font-medium text-foreground mb-1">Чтобы уточнить</div>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {aiTrend.questionsToRefine.slice(0, 5).map((x, idx) => (
+                                  <li key={idx}>{x}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap text-sm">{aiTrendRaw}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                {aiPlanText && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">План действий → Напоминания</CardTitle>
+                      <CardDescription>
+                        Напоминания создаются автоматически. Откройте раздел{' '}
+                        <Link href="/reminders" className="text-primary hover:underline">
+                          Напоминания
+                        </Link>
+                        .
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="whitespace-pre-wrap text-sm">{aiPlanText}</div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Фильтры и поиск */}
       <div className="mb-8 space-y-4">

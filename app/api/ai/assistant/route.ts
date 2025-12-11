@@ -6,6 +6,55 @@ import { parse as parseCookies } from 'cookie'
 // Использует headers/cookies, помечаем маршрут как динамический
 export const dynamic = 'force-dynamic'
 
+function getOpenAIApiKey() {
+  return process.env.OPENAI_API_KEY || process.env.OPENAI_KEY
+}
+
+function getOpenAIModel() {
+  return process.env.OPENAI_MODEL || 'gpt-4o-mini'
+}
+
+async function callOpenAIChat(params: {
+  system: string
+  user: string
+  temperature?: number
+  responseFormat?: { type: 'json_object' }
+}) {
+  const apiKey = getOpenAIApiKey()
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is missing')
+  }
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: getOpenAIModel(),
+      messages: [
+        { role: 'system', content: params.system },
+        { role: 'user', content: params.user }
+      ],
+      temperature: params.temperature ?? 0.3,
+      ...(params.responseFormat ? { response_format: params.responseFormat } : {})
+    })
+  })
+
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => '')
+    throw new Error(`OpenAI API error: ${resp.status} - ${err}`)
+  }
+
+  const json = await resp.json()
+  const text = json?.choices?.[0]?.message?.content
+  if (typeof text !== 'string' || text.trim().length === 0) {
+    throw new Error('OpenAI returned empty response')
+  }
+  return text
+}
+
 // Определяем функции, которые может выполнять AI ассистент
 const availableFunctions = {
   // Запись на прием
@@ -77,14 +126,20 @@ const availableFunctions = {
 export async function POST(request: NextRequest) {
   try {
     console.log('[AI-ASSISTANT] Starting request processing')
+    console.log('[AI-ASSISTANT] OpenAI key present:', !!getOpenAIApiKey())
     console.log('[AI-ASSISTANT] Prisma client status:', { 
       isPrismaAvailable: !!prisma,
       hasDoctorProfileModel: !!prisma?.doctorProfile,
       prismaType: typeof prisma 
     })
     
-    const { message, history } = await request.json()
-    console.log('[AI-ASSISTANT] Request data:', { message: message?.substring(0, 100), hasHistory: !!history })
+    const { message, history, documentIds, ragScope } = await request.json()
+    console.log('[AI-ASSISTANT] Request data:', { 
+      message: message?.substring(0, 100), 
+      hasHistory: !!history,
+      documentIdsCount: Array.isArray(documentIds) ? documentIds.length : 0,
+      ragScope: typeof ragScope === 'string' ? ragScope : 'default'
+    })
 
     if (!message || typeof message !== 'string') {
       console.log('[AI-ASSISTANT] Invalid message format')
@@ -130,34 +185,70 @@ export async function POST(request: NextRequest) {
 
     const userId = payload.userId
 
+    const normalizedDocumentIds: string[] =
+      Array.isArray(documentIds) ? documentIds.filter((x) => typeof x === 'string' && x.trim().length > 0) : []
+
+    const effectiveRagScope: 'none' | 'attached' | 'all' =
+      ragScope === 'all' || ragScope === 'attached' || ragScope === 'none'
+        ? ragScope
+        : normalizedDocumentIds.length > 0
+          ? 'attached'
+          : 'none'
+
+    // RAG режим: либо по прикрепленным документам, либо "по всем данным пользователя".
+    // В RAG режиме не запускаем авто-функции (иначе вопросы уйдут в get_analysis_results и потеряем цитирование).
+    if (effectiveRagScope !== 'none') {
+      console.log('[AI-ASSISTANT] Using RAG mode:', effectiveRagScope)
+
+      // Если запрос похож на "сделай план действий" — генерируем план и создаём напоминания.
+      if (effectiveRagScope === 'attached' && normalizedDocumentIds.length > 0 && isCarePlanIntent(message)) {
+        const planResult = await createCarePlanFromDocuments(userId, message, normalizedDocumentIds)
+        return NextResponse.json({
+          response: planResult.message,
+          functionResult: planResult.data,
+          functionName: 'create_care_plan',
+          sources: planResult.sources,
+          timestamp: new Date().toISOString()
+        })
+      }
+
+      const aiResponse = await generateAIResponse(message, userId, history, normalizedDocumentIds, effectiveRagScope)
+      return NextResponse.json({
+        response: aiResponse.response,
+        sources: aiResponse.sources,
+        timestamp: new Date().toISOString()
+      })
+    }
+
     // Анализируем сообщение и определяем, какую функцию вызвать
     console.log('[AI-ASSISTANT] Analyzing message for functions')
     const functionCall = await analyzeMessageAndDetermineFunction(message, userId)
     console.log('[AI-ASSISTANT] Function call result:', functionCall)
-    
+
     if (functionCall) {
       // Выполняем функцию
       console.log('[AI-ASSISTANT] Executing function:', functionCall.name)
       const result = await executeFunction(functionCall, userId)
       console.log('[AI-ASSISTANT] Function result:', { success: !!result.message })
-      
+
       return NextResponse.json({
         response: result.message,
         functionResult: result.data,
         functionName: functionCall.name,
         timestamp: new Date().toISOString()
       })
-    } else {
-      // Обычный AI ответ без функций
-      console.log('[AI-ASSISTANT] Generating regular AI response')
-      const aiResponse = await generateAIResponse(message, userId, history)
-      console.log('[AI-ASSISTANT] AI response generated')
-      
-      return NextResponse.json({
-        response: aiResponse,
-        timestamp: new Date().toISOString()
-      })
     }
+
+    // Обычный AI ответ без функций
+    console.log('[AI-ASSISTANT] Generating regular AI response')
+    const aiResponse = await generateAIResponse(message, userId, history, [], 'none')
+    console.log('[AI-ASSISTANT] AI response generated')
+
+    return NextResponse.json({
+      response: aiResponse.response,
+      sources: aiResponse.sources,
+      timestamp: new Date().toISOString()
+    })
 
   } catch (error) {
     console.error('[AI-ASSISTANT] Detailed error:', error)
@@ -166,6 +257,158 @@ export async function POST(request: NextRequest) {
       { error: `Ошибка обработки сообщения: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     )
+  }
+}
+
+function isCarePlanIntent(message: string) {
+  const t = (message || '').toLowerCase()
+  return (
+    /план|пошагов|что делать дальше|следующие шаги|напоминан|reminder|задач/i.test(t) &&
+    !/не делай|не создавай|без напоминаний/i.test(t)
+  )
+}
+
+function safeJsonParse(text: string) {
+  try {
+    return JSON.parse(text)
+  } catch {}
+  // попытка вытащить JSON из ```json ... ```
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence?.[1]) {
+    try {
+      return JSON.parse(fence[1])
+    } catch {}
+  }
+  // попытка вытащить первый объект/массив
+  const brace = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
+  if (brace?.[1]) {
+    try {
+      return JSON.parse(brace[1])
+    } catch {}
+  }
+  return null
+}
+
+function normalizeRecurrence(value: string) {
+  const v = (value || '').toUpperCase()
+  if (v === 'DAILY' || v === 'WEEKLY' || v === 'MONTHLY' || v === 'YEARLY' || v === 'NONE') return v
+  return 'NONE'
+}
+
+function normalizeChannels(channels: any): string[] {
+  const allowed = new Set(['EMAIL', 'PUSH', 'SMS'])
+  if (!Array.isArray(channels)) return ['PUSH']
+  const out = channels.map((c) => String(c).toUpperCase()).filter((c) => allowed.has(c))
+  return out.length > 0 ? out : ['PUSH']
+}
+
+async function createCarePlanFromDocuments(userId: string, message: string, documentIds: string[]) {
+  const rag = await buildRagContext(userId, message, documentIds)
+
+  const openaiKey = getOpenAIApiKey()
+  if (!openaiKey) {
+    return {
+      message:
+        'Чтобы сформировать план действий и создать напоминания, нужен ключ OpenAI.\n\nДобавьте в `.env.local`:\n- OPENAI_API_KEY=...\n(опционально) OPENAI_MODEL=gpt-4o-mini\n\nИ перезапустите `npm run dev`.',
+      data: null,
+      sources: rag.sources
+    }
+  }
+
+  const systemPrompt = `Ты — медицинский ассистент.
+Сформируй план действий по прикрепленным медицинским документам.
+
+ВАЖНО:
+- Не ставь диагнозы.
+- Если данных недостаточно — укажи, какие данные нужны.
+- План должен быть практичным: что сделать, когда, к кому обратиться.
+
+ОТВЕЧАЙ СТРОГО В JSON (без текста вокруг):
+{
+  "tasks": [
+    {
+      "title": "string",
+      "description": "string",
+      "dueInDays": 0,
+      "recurrence": "NONE|DAILY|WEEKLY|MONTHLY|YEARLY",
+      "channels": ["PUSH","EMAIL","SMS"]
+    }
+  ]
+}
+
+Ограничения:
+- tasks: 3..7
+- dueInDays: 0..90
+- channels: минимум 1`
+
+  const userBlock = `ДАННЫЕ ИЗ ДОКУМЕНТОВ:\n${rag.contextText}\n\nЗапрос пользователя: ${message}`
+
+  let text: string
+  try {
+    text = await callOpenAIChat({
+      system: systemPrompt,
+      user: userBlock,
+      temperature: 0.2,
+      responseFormat: { type: 'json_object' }
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      message:
+        msg.includes('unsupported_country_region_territory')
+          ? 'OpenAI недоступен для текущего региона/окружения (ошибка unsupported_country_region_territory). Нужен доступный регион/прокси/другой провайдер.'
+          : 'Не удалось получить ответ от OpenAI для плана действий. Попробуйте позже.',
+      data: { error: msg },
+      sources: rag.sources
+    }
+  }
+
+  const parsed = safeJsonParse(text)
+  const tasks = Array.isArray(parsed?.tasks) ? parsed.tasks : []
+  if (tasks.length === 0) {
+    return {
+      message: 'AI не смог сформировать структурированный план. Попробуйте уточнить запрос (например: "сделай план на 2 недели").',
+      data: { raw: text },
+      sources: rag.sources
+    }
+  }
+
+  const now = Date.now()
+  const created: any[] = []
+  const docIdForLink = documentIds[0] || null
+
+  for (const t of tasks.slice(0, 7)) {
+    const title = String(t.title || '').trim()
+    if (!title) continue
+    const description = String(t.description || '').trim() || null
+    const dueInDaysNum = Math.max(0, Math.min(90, Number(t.dueInDays ?? 0) || 0))
+    const dueAt = new Date(now + dueInDaysNum * 24 * 60 * 60 * 1000)
+    const recurrence = normalizeRecurrence(t.recurrence)
+    const channels = normalizeChannels(t.channels)
+
+    const reminder = await prisma.reminder.create({
+      data: {
+        userId,
+        title,
+        description,
+        dueAt,
+        recurrence,
+        channels,
+        documentId: docIdForLink
+      }
+    })
+    created.push(reminder)
+  }
+
+  const summary =
+    created.length > 0
+      ? `Сформировал план и создал ${created.length} напоминаний. Откройте раздел “Напоминания”, чтобы управлять ими.`
+      : 'План сформирован, но напоминания создать не удалось (проверьте данные и попробуйте снова).'
+
+  return {
+    message: summary,
+    data: { reminders: created, raw: parsed },
+    sources: rag.sources
   }
 }
 
@@ -760,76 +1003,495 @@ async function getAppointments(params: any, userId: string) {
   }
 }
 
-// Генерация обычного AI ответа
-async function generateAIResponse(message: string, userId: string, history: any[]) {
-  // Используем Google Gemini если доступен
-  if (process.env.GOOGLE_API_KEY) {
-    try {
-      const systemPrompt = `Ты - персональный медицинский ассистент. Ты помогаешь пациентам с:
-- Записью на приемы к врачам
-- Получением результатов анализов
-- Персональными рекомендациями по здоровью
-- Общими вопросами о здоровье
+type RagSource = {
+  sourceType: 'document' | 'analysis' | 'diary' | 'knowledge'
+  id: string
+  label: string
+  date?: string | null
+  url?: string | null
+  snippet?: string
 
-ВАЖНО:
-- Будь дружелюбным и полезным
-- Предлагай конкретные действия
-- Объясняй медицинские термины простым языком
-- Если не знаешь ответ - предлагай обратиться к врачу
-- Отвечай на русском языке`
+  // legacy fields (kept for backwards compatibility in some fallbacks)
+  documentId?: string
+  fileName?: string
+  studyType?: string | null
+  studyDate?: string | null
+}
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `${systemPrompt}\n\nВопрос пациента: ${message}`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        })
-      })
+type AiResponseWithSources = {
+  response: string
+  sources: RagSource[]
+}
 
-      if (response.ok) {
-        const data = await response.json()
-        return data.candidates[0].content.parts[0].text
+function normalizeForSearch(input: string) {
+  return (input || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tokenize(input: string) {
+  const norm = normalizeForSearch(input)
+  if (!norm) return []
+  return norm.split(' ').filter((t) => t.length >= 2)
+}
+
+function splitIntoChunks(text: string, chunkSize = 900, overlap = 120) {
+  const clean = (text || '').replace(/\s+/g, ' ').trim()
+  if (!clean) return []
+  const chunks: string[] = []
+  let i = 0
+  while (i < clean.length) {
+    const end = Math.min(clean.length, i + chunkSize)
+    chunks.push(clean.slice(i, end))
+    if (end === clean.length) break
+    i = Math.max(0, end - overlap)
+  }
+  return chunks
+}
+
+function scoreChunk(queryTokens: string[], chunkText: string) {
+  const t = normalizeForSearch(chunkText)
+  if (!t) return 0
+  let score = 0
+  for (const q of queryTokens) {
+    if (t.includes(q)) score += 2
+  }
+  return score
+}
+
+function formatIndicatorsForPrompt(indicators: any) {
+  if (!Array.isArray(indicators) || indicators.length === 0) return ''
+  const lines: string[] = []
+  for (const i of indicators.slice(0, 80)) {
+    if (!i || typeof i !== 'object') continue
+    const name = i.name ?? i.shortName ?? 'Показатель'
+    const value = i.value ?? '—'
+    const unit = i.unit ? ` ${i.unit}` : ''
+    const refMin = i.referenceMin ?? null
+    const refMax = i.referenceMax ?? null
+    const ref =
+      refMin !== null || refMax !== null ? ` (норма: ${refMin ?? '—'}–${refMax ?? '—'})` : ''
+    const flag = i.isNormal === false ? ' ⚠️' : i.isNormal === true ? ' ✅' : ''
+    lines.push(`- ${name}: ${value}${unit}${ref}${flag}`)
+  }
+  return lines.join('\n')
+}
+
+async function buildRagContext(userId: string, message: string, documentIds: string[]) {
+  const docs = await prisma.document.findMany({
+    where: {
+      userId,
+      id: { in: documentIds }
+    },
+    select: {
+      id: true,
+      fileName: true,
+      uploadDate: true,
+      studyDate: true,
+      studyType: true,
+      laboratory: true,
+      doctor: true,
+      findings: true,
+      rawText: true,
+      indicators: true
+    }
+  })
+
+  const queryTokens = tokenize(message)
+  const scored: Array<{ score: number; docId: string; docMeta: any; snippet: string }> = []
+
+  for (const d of docs) {
+    const baseTextParts: string[] = []
+    if (d.findings) baseTextParts.push(String(d.findings))
+    if (d.rawText) baseTextParts.push(String(d.rawText))
+    const indicatorText = formatIndicatorsForPrompt(d.indicators)
+    if (indicatorText) baseTextParts.push(indicatorText)
+    const fullText = baseTextParts.join('\n')
+    const chunks = splitIntoChunks(fullText, 900, 120)
+    for (const c of chunks) {
+      const s = scoreChunk(queryTokens, c)
+      if (s > 0) {
+        scored.push({ score: s, docId: d.id, docMeta: d, snippet: c })
       }
+    }
+    // fallback: если совпадений нет, добавляем короткий фрагмент, чтобы AI видел документ
+    if (queryTokens.length > 0 && scored.filter((x) => x.docId === d.id).length === 0) {
+      const fallback = (d.findings || indicatorText || d.rawText || '').toString().slice(0, 900)
+      if (fallback) scored.push({ score: 1, docId: d.id, docMeta: d, snippet: fallback })
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score)
+  const top = scored.slice(0, 6)
+
+  const sources: RagSource[] = top.map((x) => ({
+    sourceType: 'document',
+    id: x.docId,
+    label: x.docMeta.fileName,
+    date: (x.docMeta.studyDate ?? x.docMeta.uploadDate)?.toISOString?.() ?? null,
+    url: `/documents/${x.docId}`,
+    snippet: x.snippet,
+    documentId: x.docId,
+    fileName: x.docMeta.fileName,
+    studyType: x.docMeta.studyType ?? null,
+    studyDate: (x.docMeta.studyDate ?? x.docMeta.uploadDate)?.toISOString?.() ?? null
+  }))
+
+  const promptBlocks = top.map((x, idx) => {
+    const meta = x.docMeta
+    const dateStr = meta.studyDate ?? meta.uploadDate
+      ? new Date(meta.studyDate ?? meta.uploadDate).toLocaleDateString('ru-RU')
+      : '—'
+    const header = `[SOURCE ${idx + 1}] (DOCUMENT) ${meta.fileName}; Тип: ${meta.studyType ?? '—'}; Дата: ${dateStr}; Лаб: ${meta.laboratory ?? '—'}; URL: /documents/${x.docId}`
+    return `${header}\n${x.snippet}`
+  })
+
+  return {
+    sources,
+    contextText: promptBlocks.join('\n\n')
+  }
+}
+
+async function buildAllUserRagContext(userId: string, message: string) {
+  const queryTokens = tokenize(message)
+
+  const [docs, analyses, diary, kbIndicators] = await Promise.all([
+    prisma.document.findMany({
+      where: { userId },
+      orderBy: { uploadDate: 'desc' },
+      take: 40,
+      select: {
+        id: true,
+        fileName: true,
+        uploadDate: true,
+        studyDate: true,
+        studyType: true,
+        laboratory: true,
+        doctor: true,
+        findings: true,
+        rawText: true,
+        indicators: true
+      }
+    }),
+    prisma.analysis.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: 60,
+      select: { id: true, title: true, type: true, date: true, status: true, results: true, notes: true }
+    }),
+    prisma.healthDiaryEntry.findMany({
+      where: { userId },
+      orderBy: { entryDate: 'desc' },
+      take: 90,
+      select: {
+        id: true,
+        entryDate: true,
+        mood: true,
+        painScore: true,
+        sleepHours: true,
+        steps: true,
+        temperature: true,
+        weight: true,
+        systolic: true,
+        diastolic: true,
+        pulse: true,
+        symptoms: true,
+        notes: true
+      }
+    }),
+    (async () => {
+      const toks = queryTokens.slice(0, 6)
+      if (toks.length === 0) return []
+      const OR: any[] = []
+      for (const t of toks) {
+        OR.push({ name: { contains: t, mode: 'insensitive' } })
+        OR.push({ shortName: { contains: t, mode: 'insensitive' } })
+        OR.push({ description: { contains: t, mode: 'insensitive' } })
+        OR.push({ increasedMeaning: { contains: t, mode: 'insensitive' } })
+        OR.push({ decreasedMeaning: { contains: t, mode: 'insensitive' } })
+      }
+      return await prisma.indicator.findMany({
+        where: { OR },
+        take: 18,
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          unit: true,
+          description: true,
+          increasedMeaning: true,
+          decreasedMeaning: true,
+          maintenanceRecommendations: true,
+          improvementRecommendations: true
+        }
+      })
+    })()
+  ])
+
+  const scored: Array<{ score: number; source: RagSource; snippet: string }> = []
+
+  // documents
+  for (const d of docs) {
+    const baseTextParts: string[] = []
+    if (d.findings) baseTextParts.push(String(d.findings))
+    if (d.rawText) baseTextParts.push(String(d.rawText))
+    const indicatorText = formatIndicatorsForPrompt(d.indicators)
+    if (indicatorText) baseTextParts.push(indicatorText)
+    const fullText = baseTextParts.join('\n')
+    const chunks = splitIntoChunks(fullText, 900, 120)
+    for (const c of chunks) {
+      const s = scoreChunk(queryTokens, c)
+      if (s > 0) {
+        scored.push({
+          score: s + 1,
+          source: {
+            sourceType: 'document',
+            id: d.id,
+            label: d.fileName,
+            date: (d.studyDate ?? d.uploadDate)?.toISOString?.() ?? null,
+            url: `/documents/${d.id}`,
+            snippet: c,
+            documentId: d.id,
+            fileName: d.fileName,
+            studyType: d.studyType ?? null,
+            studyDate: (d.studyDate ?? d.uploadDate)?.toISOString?.() ?? null
+          },
+          snippet: c
+        })
+      }
+    }
+  }
+
+  // analyses
+  for (const a of analyses) {
+    let parsed: any = null
+    try {
+      parsed = a?.results ? JSON.parse(a.results as unknown as string) : null
+    } catch {
+      parsed = null
+    }
+    const inds = Array.isArray(parsed?.indicators) ? parsed.indicators : []
+    const indsText = formatIndicatorsForPrompt(inds)
+    const notes = a.notes ? String(a.notes) : ''
+    const header = `Анализ: ${a.title}; Тип: ${a.type}; Дата: ${(a.date as unknown as Date).toISOString().slice(0, 10)}; Статус: ${a.status}; URL: /analyses/${a.id}`
+    const fullText = [header, indsText, notes].filter(Boolean).join('\n')
+    const chunks = splitIntoChunks(fullText, 900, 120)
+    for (const c of chunks) {
+      const s = scoreChunk(queryTokens, c)
+      if (s > 0) {
+        scored.push({
+          score: s + 2,
+          source: {
+            sourceType: 'analysis',
+            id: a.id,
+            label: a.title,
+            date: (a.date as unknown as Date).toISOString?.() ?? null,
+            url: `/analyses/${a.id}`,
+            snippet: c
+          },
+          snippet: c
+        })
+      }
+    }
+  }
+
+  // diary
+  for (const e of diary) {
+    const dateIso = (e.entryDate as unknown as Date).toISOString?.() ?? null
+    const lines: string[] = []
+    lines.push(`Дневник: ${(e.entryDate as unknown as Date).toISOString().slice(0, 10)}`)
+    if (e.symptoms) lines.push(`Симптомы: ${e.symptoms}`)
+    if (e.notes) lines.push(`Заметки: ${e.notes}`)
+    const vitals: string[] = []
+    if (typeof e.sleepHours === 'number') vitals.push(`сон ${e.sleepHours}ч`)
+    if (typeof e.steps === 'number') vitals.push(`шаги ${e.steps}`)
+    if (typeof e.temperature === 'number') vitals.push(`t ${e.temperature}`)
+    if (typeof e.weight === 'number') vitals.push(`вес ${e.weight}`)
+    if (typeof e.pulse === 'number') vitals.push(`пульс ${e.pulse}`)
+    if (typeof e.systolic === 'number' && typeof e.diastolic === 'number') vitals.push(`АД ${e.systolic}/${e.diastolic}`)
+    if (typeof e.mood === 'number') vitals.push(`настроение ${e.mood}/5`)
+    if (typeof e.painScore === 'number') vitals.push(`боль ${e.painScore}/10`)
+    if (vitals.length) lines.push(`Показатели: ${vitals.join(', ')}`)
+    const text = lines.join('\n')
+    const s = scoreChunk(queryTokens, text)
+    if (s > 0) {
+      scored.push({
+        score: s + 1,
+        source: {
+          sourceType: 'diary',
+          id: e.id,
+          label: `Дневник ${dateIso ? new Date(dateIso).toLocaleDateString('ru-RU') : ''}`.trim(),
+          date: dateIso,
+          url: null,
+          snippet: text
+        },
+        snippet: text
+      })
+    }
+  }
+
+  // knowledge
+  for (const k of kbIndicators as any[]) {
+    const text = [
+      `Показатель: ${k.name}${k.shortName ? ` (${k.shortName})` : ''}; Ед.: ${k.unit}`,
+      k.description ? `Описание: ${k.description}` : '',
+      k.increasedMeaning ? `Повышение: ${k.increasedMeaning}` : '',
+      k.decreasedMeaning ? `Понижение: ${k.decreasedMeaning}` : '',
+      k.maintenanceRecommendations ? `Поддержание: ${k.maintenanceRecommendations}` : '',
+      k.improvementRecommendations ? `Улучшение: ${k.improvementRecommendations}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 900)
+    const s = scoreChunk(queryTokens, text)
+    if (s > 0) {
+      scored.push({
+        score: s + 1,
+        source: {
+          sourceType: 'knowledge',
+          id: k.id,
+          label: k.name,
+          date: null,
+          url: null,
+          snippet: text
+        },
+        snippet: text
+      })
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score)
+  const picked: typeof scored = []
+  const byType = (t: RagSource['sourceType']) => scored.filter((x) => x.source.sourceType === t)
+  for (const t of ['analysis', 'document', 'diary', 'knowledge'] as const) {
+    picked.push(...byType(t).slice(0, 2))
+  }
+  for (const x of scored) {
+    if (picked.length >= 10) break
+    if (picked.some((p) => p.source.sourceType === x.source.sourceType && p.source.id === x.source.id && p.snippet === x.snippet)) continue
+    picked.push(x)
+  }
+  const top = picked.slice(0, 10)
+
+  const sources: RagSource[] = top.map((x) => ({ ...x.source, snippet: x.snippet }))
+  const promptBlocks = top.map((x, idx) => {
+    const src = x.source
+    const dateStr = src.date ? new Date(src.date).toLocaleDateString('ru-RU') : '—'
+    const urlStr = src.url ? `; URL: ${src.url}` : ''
+    const header = `[SOURCE ${idx + 1}] (${src.sourceType.toUpperCase()}) ${src.label}; Дата: ${dateStr}${urlStr}`
+    return `${header}\n${x.snippet}`
+  })
+
+  return { sources, contextText: promptBlocks.join('\n\n') }
+}
+
+// Генерация обычного AI ответа (с RAG по прикрепленным документам / по всем данным пользователя)
+async function generateAIResponse(
+  message: string,
+  userId: string,
+  history: any[],
+  documentIds: string[],
+  ragScope: 'none' | 'attached' | 'all'
+): Promise<AiResponseWithSources> {
+  const hasDocs = Array.isArray(documentIds) && documentIds.length > 0
+  const rag =
+    ragScope === 'all'
+      ? await buildAllUserRagContext(userId, message)
+      : hasDocs
+        ? await buildRagContext(userId, message, documentIds)
+        : { sources: [], contextText: '' }
+
+  // Используем OpenAI если доступен
+  const openaiKey = getOpenAIApiKey()
+  if (openaiKey) {
+    try {
+      const systemPrompt = `Ты — персональный медицинский ассистент.
+
+Твоя задача: отвечать на вопрос пациента на русском языке.
+
+КРИТИЧЕСКИ ВАЖНО:
+- Если приложены источники (SOURCE), опирайся ТОЛЬКО на них и не выдумывай факты.
+- Если данных в SOURCE недостаточно — честно скажи, чего не хватает, и что нужно уточнить/загрузить.
+- Не ставь диагнозы. При рисках — рекомендуй обратиться к врачу/в неотложную помощь.
+- Объясняй медицинские термины простым языком.
+
+ФОРМАТ ОТВЕТА:
+1) Короткий вывод (1–3 предложения)
+2) Детали/объяснение по пунктам
+3) Что делать дальше (практические шаги)
+4) Источники: перечисли использованные SOURCE (например: SOURCE 1, SOURCE 2). Если у SOURCE есть URL — добавь его.`
+
+      const userBlock =
+        rag.contextText && rag.contextText.trim().length > 0
+          ? `ДАННЫЕ (RAG):\n${rag.contextText}\n\nВопрос пациента: ${message}`
+          : `Вопрос пациента: ${message}`
+
+      const text = await callOpenAIChat({
+        system: systemPrompt,
+        user: userBlock,
+        temperature: 0.5
+      })
+      return { response: text, sources: rag.sources }
     } catch (error) {
-      console.error('Gemini error:', error)
+      console.error('OpenAI error:', error)
     }
   }
 
   // Fallback ответы
   const lowerMessage = message.toLowerCase()
-  
+
   if (lowerMessage.match(/привет|здравствуй|добрый день/)) {
-    return 'Здравствуйте! 👋 Я ваш персональный медицинский ассистент. Я могу помочь вам:\n\n• 📅 Записаться на прием к врачу\n• 📊 Показать результаты анализов\n• 💡 Дать персональные рекомендации\n• 👨‍⚕️ Найти подходящего врача\n\nЧто вас интересует?'
+    return {
+      response:
+        'Здравствуйте! Я ваш персональный медицинский ассистент.\n\nЯ могу помочь вам:\n\n• Записаться на прием к врачу\n• Показать результаты анализов\n• Дать персональные рекомендации\n• Найти подходящего врача\n\nЧто вас интересует?',
+      sources: rag.sources
+    }
   }
-  
+
   if (lowerMessage.match(/помощь|что ты умеешь|возможности/)) {
-    return 'Я умею:\n\n📅 **Запись на прием**: "Запиши меня на прием к терапевту завтра в 10:00"\n📊 **Результаты анализов**: "Покажи мои последние анализы крови"\n💡 **Рекомендации**: "Дай мне рекомендации по питанию"\n👨‍⚕️ **Поиск врачей**: "Найди кардиолога"\n📋 **Мои записи**: "Покажи мои предстоящие приемы"\n\nПросто скажите, что вам нужно!'
+    return {
+      response:
+        'Я умею:\n\n• Запись на прием: "Запиши меня на прием к терапевту завтра в 10:00"\n• Результаты анализов: "Покажи мои последние анализы крови"\n• Рекомендации: "Дай мне рекомендации по питанию"\n• Поиск врачей: "Найди кардиолога"\n• Мои записи: "Покажи мои предстоящие приемы"\n\nЕсли вы прикрепите документы в чате — я смогу отвечать по ним (с источниками).',
+      sources: rag.sources
+    }
   }
 
   if (lowerMessage.match(/спасибо|благодарю/)) {
-    return 'Пожалуйста! 😊 Рад был помочь. Если возникнут еще вопросы - обращайтесь!'
+    return { response: 'Пожалуйста! Рад был помочь. Если возникнут еще вопросы — обращайтесь!', sources: rag.sources }
   }
 
   if (lowerMessage.match(/как дела|как ты/)) {
-    return 'У меня все отлично! 😊 Готов помочь вам с медицинскими вопросами и задачами.'
+    return { response: 'У меня все отлично! Готов помочь вам с медицинскими вопросами и задачами.', sources: rag.sources }
   }
 
   if (lowerMessage.match(/время|дата|сегодня|завтра/)) {
     const now = new Date()
-    return `📅 Сегодня: ${now.toLocaleDateString('ru-RU')}\n🕐 Время: ${now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}\n\nНужна помощь с записью на прием?`
+    return {
+      response: `Сегодня: ${now.toLocaleDateString('ru-RU')}\nВремя: ${now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}\n\nНужна помощь с записью на прием?`,
+      sources: rag.sources
+    }
   }
-  
-  return 'Я готов помочь вам с медицинскими вопросами! Попробуйте спросить:\n\n• "Запиши меня на прием к врачу"\n• "Покажи мои анализы"\n• "Дай рекомендации по здоровью"\n• "Найди терапевта"\n• "Покажи мои записи на приемы"'
+
+  // Если есть источники, но OpenAI не настроен — скажем прямо и покажем, что нашли
+  if (rag.sources.length > 0) {
+    return {
+      response:
+        `Я вижу ваши данные, но AI сейчас не настроен (нет OPENAI_API_KEY).\n\nЯ могу использовать эти источники:\n${rag.sources
+          .slice(0, 3)
+          .map((s, idx) => `- SOURCE ${idx + 1}: ${s.label}${s.url ? ` (${s.url})` : ''}`)
+          .join('\n')}\n\nДобавьте OPENAI_API_KEY — и я смогу сделать полноценный разбор по документам.`,
+      sources: rag.sources
+    }
+  }
+
+  return {
+    response:
+      'Я готов помочь вам с медицинскими вопросами! Попробуйте спросить:\n\n• "Запиши меня на прием к врачу"\n• "Покажи мои анализы"\n• "Дай рекомендации по здоровью"\n• "Найди терапевта"\n• "Покажи мои записи на приемы"',
+    sources: rag.sources
+  }
 }
 
 // Вспомогательные функции
