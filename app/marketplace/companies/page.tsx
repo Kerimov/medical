@@ -259,12 +259,12 @@ export default function CompaniesPage() {
                 </Select>
 
                 <div className="flex gap-2 flex-1">
-                  <Select value={cityFilter} onValueChange={setCityFilter}>
+                  <Select value={cityFilter || 'all'} onValueChange={(value) => setCityFilter(value === 'all' ? '' : value)}>
                     <SelectTrigger className="flex-1 border-0 bg-white/50">
                       <SelectValue placeholder="Выберите город" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Все города</SelectItem>
+                      <SelectItem value="all">Все города</SelectItem>
                       {availableCities.map((city) => (
                         <SelectItem key={city} value={city}>
                           {city}
