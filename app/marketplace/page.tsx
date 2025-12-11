@@ -130,23 +130,39 @@ export default function MarketplacePage() {
   const generateRecommendations = async () => {
     try {
       setLoading(true)
+      setError(null)
       const response = await fetch('/api/marketplace/recommendations/generate', {
         method: 'POST',
         credentials: 'include'
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Ошибка генерации рекомендаций')
+        throw new Error(data.error || 'Ошибка генерации рекомендаций')
       }
 
-      const data = await response.json()
       console.log('Generated recommendations:', data)
+      
+      // Если есть предупреждение, показываем его
+      if (data.warning) {
+        setError(data.warning)
+      }
       
       // Обновляем список рекомендаций
       await fetchRecommendations()
+      
+      // Показываем успешное сообщение
+      if (data.count > 0) {
+        alert(`Успешно создано ${data.count} рекомендаций!`)
+      } else if (data.warning) {
+        alert(data.warning)
+      }
     } catch (error) {
       console.error('Error generating recommendations:', error)
-      setError('Ошибка генерации рекомендаций')
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка генерации рекомендаций'
+      setError(errorMessage)
+      alert(errorMessage)
     } finally {
       setLoading(false)
     }

@@ -212,13 +212,20 @@ export async function createEnhancedRecommendationsForUser(
   userLocation?: UserLocation
 ) {
   try {
-    logger.info(`Generating enhanced recommendations for user ${userId}`)
+    logger.info(`Generating enhanced recommendations for user ${userId}`, 'recommendations')
 
     const recommendations: any[] = []
 
     // Анализируем здоровье пользователя
     const healthData = await analyzeUserHealth(userId)
-    const { healthIssues, abnormalIndicators, recentAnalyses } = healthData
+    const { healthIssues, abnormalIndicators, recentAnalyses, documents } = healthData
+
+    logger.info(`Health analysis results:`, 'recommendations', {
+      healthIssues: healthIssues.length,
+      abnormalIndicators: abnormalIndicators.length,
+      recentAnalyses: recentAnalyses.length,
+      documents: documents.length
+    })
 
     // Получаем информацию о пользователе
     const user = await prisma.user.findUnique({
@@ -452,11 +459,16 @@ export async function createEnhancedRecommendationsForUser(
     // Fallback: если есть анализы со статусом abnormal, но не удалось разобрать показатели — создаем базовые рекомендации
     if (recommendations.length === 0) {
       const abnormalAnalyses = (recentAnalyses || []).filter(a => (a as any)?.status === 'abnormal')
+      
+      logger.info(`No specific health issues found, checking abnormal analyses: ${abnormalAnalyses.length}`, 'recommendations')
+      
       if (abnormalAnalyses.length > 0) {
         const [labs, clinics] = await Promise.all([
           findNearbyCompanies('LABORATORY', userLocation, 2),
           findNearbyCompanies('CLINIC', userLocation, 1)
         ])
+
+        logger.info(`Found companies: labs=${labs.length}, clinics=${clinics.length}`, 'recommendations')
 
         for (const a of abnormalAnalyses.slice(0, 2)) {
           if (labs.length > 0) {
@@ -468,7 +480,7 @@ export async function createEnhancedRecommendationsForUser(
               reason: 'Обнаружены отклонения в результатах анализа',
               priority: 4,
               companyId: labs[0].id,
-            metadata: { analysisId: (a as any).id, distance: (labs[0] as any).distance, aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль в ближайшей лаборатории.' }
+              metadata: { analysisId: (a as any).id, distance: (labs[0] as any).distance, aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль в ближайшей лаборатории.' }
             })
           }
 
@@ -484,6 +496,46 @@ export async function createEnhancedRecommendationsForUser(
               metadata: { analysisId: (a as any).id, distance: (clinics[0] as any).distance, aiExplanation: 'Очная консультация нужна для выбора дальнейших шагов и исключения серьёзной патологии.' }
             })
           }
+        }
+      } else if (recentAnalyses.length > 0 || documents.length > 0) {
+        // Если есть анализы или документы, но нет отклонений - создаем общие рекомендации
+        logger.info(`Creating general recommendations for user with analyses/documents`, 'recommendations')
+        
+        const [labs, clinics] = await Promise.all([
+          findNearbyCompanies('LABORATORY', userLocation, 1),
+          findNearbyCompanies('CLINIC', userLocation, 1)
+        ])
+
+        if (labs.length > 0) {
+          recommendations.push({
+            userId,
+            type: 'ANALYSIS',
+            title: 'Плановый профилактический осмотр',
+            description: 'Рекомендуем регулярно проходить профилактические обследования для поддержания здоровья.',
+            reason: 'Профилактика и раннее выявление заболеваний',
+            priority: 2,
+            companyId: labs[0].id,
+            metadata: { 
+              distance: (labs[0] as any).distance, 
+              aiExplanation: 'Регулярные профилактические обследования помогают выявить проблемы на ранней стадии.' 
+            }
+          })
+        }
+
+        if (clinics.length > 0) {
+          recommendations.push({
+            userId,
+            type: 'SERVICE',
+            title: 'Консультация врача для профилактики',
+            description: 'Регулярные консультации с врачом помогают поддерживать здоровье и своевременно выявлять проблемы.',
+            reason: 'Профилактика и поддержание здоровья',
+            priority: 2,
+            companyId: clinics[0].id,
+            metadata: { 
+              distance: (clinics[0] as any).distance, 
+              aiExplanation: 'Профилактические визиты к врачу важны для поддержания здоровья.' 
+            }
+          })
         }
       }
     }

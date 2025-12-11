@@ -34,6 +34,17 @@ export async function POST(request: NextRequest) {
       userLocation
     )
 
+    logger.info(`Generated ${recommendations.length} recommendations for user ${decoded.userId}`, 'recommendations')
+
+    if (recommendations.length === 0) {
+      return NextResponse.json({
+        message: 'Рекомендации не найдены. Убедитесь, что у вас есть загруженные анализы с отклонениями.',
+        recommendations: [],
+        count: 0,
+        warning: 'Для генерации рекомендаций необходимы анализы с отклонениями от нормы'
+      })
+    }
+
     return NextResponse.json({
       message: `Создано ${recommendations.length} новых персонализированных рекомендаций`,
       recommendations,
@@ -41,6 +52,10 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     logger.error('Error generating recommendations:', error instanceof Error ? error.message : String(error))
-    return NextResponse.json({ error: 'Ошибка генерации рекомендаций' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Ошибка генерации рекомендаций'
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: error instanceof Error ? error.stack : undefined
+    }, { status: 500 })
   }
 }
