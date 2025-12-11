@@ -180,20 +180,57 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const analysisId = typeof body?.analysisId === 'string' ? body.analysisId.trim() : ''
+    const appointmentId = typeof body?.appointmentId === 'string' ? body.appointmentId.trim() : ''
     const days = typeof body?.days === 'number' ? body.days : 180
     const complaints = typeof body?.complaints === 'string' ? body.complaints.trim() : ''
     const medications = typeof body?.medications === 'string' ? body.medications.trim() : ''
 
+    // если передан appointmentId — формируем отчёт "перед визитом" с учётом анкеты
+    let reportUserId = payload.userId
+    let reportUserName: string | null = null
+    let preVisitBlock: any = null
+    let derivedComplaints = complaints
+    let derivedMedications = medications
+    if (appointmentId) {
+      const appt = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        select: { id: true, patientId: true, doctorId: true, scheduledAt: true, appointmentType: true }
+      })
+      if (!appt) return NextResponse.json({ error: 'Запись не найдена' }, { status: 404 })
+
+      // доступ: пациент (владелец) или врач (по doctorId)
+      const isPatient = appt.patientId === payload.userId
+      const doctorProfile = await prisma.doctorProfile.findUnique({ where: { userId: payload.userId }, select: { id: true } })
+      const isDoctor = !!doctorProfile?.id && doctorProfile.id === appt.doctorId
+      if (!isPatient && !isDoctor) return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 })
+
+      reportUserId = appt.patientId
+      const q = await prisma.preVisitQuestionnaire.findUnique({ where: { appointmentId } })
+      preVisitBlock = q?.answers || null
+      if (preVisitBlock && typeof preVisitBlock === 'object') {
+        const c = typeof (preVisitBlock as any).complaints === 'string' ? (preVisitBlock as any).complaints.trim() : ''
+        const g = typeof (preVisitBlock as any).goal === 'string' ? (preVisitBlock as any).goal.trim() : ''
+        const d = typeof (preVisitBlock as any).duration === 'string' ? (preVisitBlock as any).duration.trim() : ''
+        const v = typeof (preVisitBlock as any).vitals === 'string' ? (preVisitBlock as any).vitals.trim() : ''
+        derivedComplaints = [g ? `Цель: ${g}` : '', c ? `Жалобы: ${c}` : '', d ? `Длительность/динамика: ${d}` : '', v ? `Показатели: ${v}` : '']
+          .filter(Boolean)
+          .join('\n')
+        const m = typeof (preVisitBlock as any).currentMedications === 'string' ? (preVisitBlock as any).currentMedications.trim() : ''
+        derivedMedications = m || medications
+      }
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: reportUserId },
       select: { id: true, name: true }
     })
     if (!user) return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+    reportUserName = user.name
 
     const since = new Date(Date.now() - Math.max(30, Math.min(3650, days)) * 24 * 60 * 60 * 1000)
 
     const analyses = await prisma.analysis.findMany({
-      where: { userId: payload.userId, date: { gte: since } },
+      where: { userId: reportUserId, date: { gte: since } },
       orderBy: { date: 'asc' },
       select: { id: true, title: true, type: true, date: true, status: true, results: true, laboratory: true, doctor: true }
     })
@@ -263,10 +300,11 @@ export async function POST(request: NextRequest) {
   "questions": ["вопросы врачу (до 10)"]
 }`
 
-      const userPrompt = `Пациент: ${user.name}
+      const userPrompt = `Пациент: ${reportUserName}
 Дата генерации: ${generatedAtIso}
-Жалобы/цель визита: ${complaints || '—'}
-Лекарства/БАДы: ${medications || '—'}
+Жалобы/цель визита: ${derivedComplaints || '—'}
+Лекарства/БАДы: ${derivedMedications || '—'}
+Анкета перед визитом (если есть): ${preVisitBlock ? JSON.stringify(preVisitBlock, null, 2) : '—'}
 Фокусный анализ: ${focus ? `${(focus.date as unknown as Date).toISOString().slice(0, 10)} — ${focus.title} (${focus.status})` : '—'}
 
 Данные анализов (последние):
@@ -297,10 +335,10 @@ ${JSON.stringify(compactAnalyses, null, 2)}
     }
 
     const markdown = toMarkdownReport({
-      patientName: user.name,
+      patientName: reportUserName,
       generatedAtIso,
-      complaints: complaints || undefined,
-      medications: medications || undefined,
+      complaints: derivedComplaints || undefined,
+      medications: derivedMedications || undefined,
       summary,
       rawFacts: {
         lastAnalyses: analyses
@@ -320,7 +358,7 @@ ${JSON.stringify(compactAnalyses, null, 2)}
 
     const doc = await prisma.document.create({
       data: {
-        userId: payload.userId,
+        userId: reportUserId,
         fileName,
         fileType: 'text/markdown',
         fileSize: buf.length,

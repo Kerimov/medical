@@ -50,6 +50,11 @@ interface Appointment {
   notes?: string
   createdAt: string
   updatedAt: string
+  preVisit?: {
+    id: string
+    submittedAt?: string | null
+    updatedAt?: string | null
+  } | null
   doctor: {
     id: string
     specialization: string
@@ -151,6 +156,12 @@ export default function MyAppointmentsPage() {
 
   const isUpcoming = (scheduledAt: string) => {
     return new Date(scheduledAt) > new Date()
+  }
+
+  const isWithin48h = (scheduledAt: string) => {
+    const t = new Date(scheduledAt).getTime()
+    const now = Date.now()
+    return t > now && t - now <= 48 * 60 * 60 * 1000
   }
 
   const handleStatusChange = async (appointmentId: string, newStatus: string, newScheduledAt?: string) => {
@@ -379,6 +390,20 @@ export default function MyAppointmentsPage() {
                     {/* Кнопки управления записью */}
                     {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
                       <div className="mt-4 flex gap-2">
+                        {isWithin48h(appointment.scheduledAt) && (
+                          <Link href={`/pre-visit/${appointment.id}`}>
+                            <Button
+                              size="sm"
+                              className={
+                                appointment.preVisit?.submittedAt
+                                  ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                                  : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white'
+                              }
+                            >
+                              {appointment.preVisit?.submittedAt ? 'Анкета заполнена' : 'Анкета перед визитом'}
+                            </Button>
+                          </Link>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

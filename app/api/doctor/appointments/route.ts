@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     // Получаем записи на прием к врачу
     const appointments = await prisma.appointment.findMany({
       where: { doctorId: doctorProfile.id },
+      include: { preVisit: { select: { id: true, submittedAt: true, updatedAt: true } } },
       orderBy: { scheduledAt: 'desc' }
     })
 
@@ -54,6 +55,11 @@ export async function GET(request: NextRequest) {
       duration: appointment.duration,
       status: appointment.status,
       notes: appointment.notes,
+      preVisit: appointment.preVisit ? {
+        id: appointment.preVisit.id,
+        submittedAt: appointment.preVisit.submittedAt,
+        updatedAt: appointment.preVisit.updatedAt
+      } : null,
       createdAt: appointment.createdAt,
       updatedAt: appointment.updatedAt
     }))

@@ -34,6 +34,10 @@ export async function GET(request: NextRequest) {
             }
           }
         }
+        ,
+        preVisit: {
+          select: { id: true, submittedAt: true, updatedAt: true }
+        }
       },
       orderBy: { scheduledAt: 'asc' }
     })
