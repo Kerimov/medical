@@ -74,13 +74,6 @@ export async function GET(request: NextRequest) {
         }
       }))
       
-      // Добавляем точное совпадение
-      cityConditions.push({
-        city: {
-          equals: city
-        }
-      })
-      
       conditions.push({ OR: cityConditions })
     }
 
