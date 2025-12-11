@@ -291,70 +291,74 @@ export async function createEnhancedRecommendationsForUser(
         ind.name.toLowerCase().includes('25-oh')
       )
 
-      // Находим ближайшие лаборатории
-      const laboratories = await findNearbyCompanies('LABORATORY', userLocation, 3)
-      
-      if (laboratories.length > 0) {
-        for (const lab of laboratories.slice(0, 2)) {
-          recommendations.push({
-            userId,
-            type: 'ANALYSIS',
-            title: 'Повторный анализ на витамин D',
-            description: `Рекомендуем сдать контрольный анализ на витамин D через 2-3 месяца после начала приема добавок. Текущий уровень: ${vitDIndicator?.value} ${vitDIndicator?.unit}`,
-            reason: `Низкий уровень витамина D (${vitDIndicator?.value} ${vitDIndicator?.unit})`,
-            priority: 5,
-            companyId: lab.id,
-            metadata: {
-              testType: 'vitamin_d',
-              currentValue: vitDIndicator?.value,
-              distance: (lab as any).distance,
-              aiExplanation: 'Обнаружен дефицит витамина D по результатам анализа. Рекомендуем контрольное исследование для подтверждения динамики и подбора коррекции.'
-            }
-          })
+      // Рекомендация анализа (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'ANALYSIS',
+        title: 'Повторный анализ на витамин D',
+        description: `Рекомендуем сдать контрольный анализ на витамин D через 2-3 месяца после начала приема добавок. Текущий уровень: ${vitDIndicator?.value} ${vitDIndicator?.unit}`,
+        reason: `Низкий уровень витамина D (${vitDIndicator?.value} ${vitDIndicator?.unit})`,
+        priority: 5,
+        companyId: null, // Без привязки к компании
+        metadata: {
+          testType: 'vitamin_d',
+          currentValue: vitDIndicator?.value,
+          aiExplanation: 'Обнаружен дефицит витамина D по результатам анализа. Рекомендуем контрольное исследование для подтверждения динамики и подбора коррекции.'
         }
-      }
+      })
 
-      // Находим аптеки и магазины здорового питания
-      const pharmacies = await findNearbyCompanies('PHARMACY', userLocation, 2)
-      const healthStores = await findNearbyCompanies('HEALTH_STORE', userLocation, 2)
-
-      const stores = [...pharmacies, ...healthStores]
-      
-      if (stores.length > 0) {
-        for (const store of stores.slice(0, 2)) {
-          recommendations.push({
-            userId,
-            type: 'SUPPLEMENT',
-            title: 'Витамин D3 для коррекции дефицита',
-            description: 'Рекомендуется прием витамина D3 в дозировке 2000-4000 МЕ в день. Проконсультируйтесь с врачом для подбора оптимальной дозы.',
-            reason: `Дефицит витамина D (${vitDIndicator?.value} ${vitDIndicator?.unit})`,
-            priority: 5,
-            companyId: store.id,
-            metadata: {
-              supplementType: 'vitamin_d3',
-              recommendedDosage: '2000-4000 МЕ',
-              duration: '2-3 месяца',
-              distance: (store as any).distance,
-              aiExplanation: 'Добавки витамина D3 помогают безопасно и предсказуемо повысить уровень 25‑OH D до целевых значений.'
-            }
-          })
+      // Рекомендация добавок (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SUPPLEMENT',
+        title: 'Витамин D3 для коррекции дефицита',
+        description: 'Рекомендуется прием витамина D3 в дозировке 2000-4000 МЕ в день. Проконсультируйтесь с врачом для подбора оптимальной дозы. Можно приобрести в аптеке или магазине здорового питания.',
+        reason: `Дефицит витамина D (${vitDIndicator?.value} ${vitDIndicator?.unit})`,
+        priority: 5,
+        companyId: null, // Без привязки к компании
+        metadata: {
+          supplementType: 'vitamin_d3',
+          recommendedDosage: '2000-4000 МЕ',
+          duration: '2-3 месяца',
+          aiExplanation: 'Добавки витамина D3 помогают безопасно и предсказуемо повысить уровень 25‑OH D до целевых значений.'
         }
-      }
+      })
 
       // Рекомендация статьи
-        recommendations.push({
+      recommendations.push({
         userId,
         type: 'ARTICLE',
         title: 'Витамин D: важность и способы коррекции дефицита',
         description: 'Подробная статья о роли витамина D в организме, причинах и последствиях дефицита, способах профилактики и лечения.',
         reason: 'Дефицит витамина D',
         priority: 3,
+        companyId: null,
         metadata: {
           articleUrl: 'https://example.com/vitamin-d-deficiency',
-            readingTime: '10 минут',
-            aiExplanation: 'Рекомендуем ознакомиться с материалом, который поможет понять причины дефицита и принципы его коррекции.'
+          readingTime: '10 минут',
+          aiExplanation: 'Рекомендуем ознакомиться с материалом, который поможет понять причины дефицита и принципы его коррекции.'
         }
       })
+
+      // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
+      const laboratories = await findNearbyCompanies('LABORATORY', userLocation, 1)
+      if (laboratories.length > 0) {
+        recommendations.push({
+          userId,
+          type: 'ANALYSIS',
+          title: `Лаборатория "${laboratories[0].name}" для сдачи анализа`,
+          description: `Можете сдать анализ на витамин D в этой лаборатории. Текущий уровень: ${vitDIndicator?.value} ${vitDIndicator?.unit}`,
+          reason: `Низкий уровень витамина D (${vitDIndicator?.value} ${vitDIndicator?.unit})`,
+          priority: 4,
+          companyId: laboratories[0].id,
+          metadata: {
+            testType: 'vitamin_d',
+            currentValue: vitDIndicator?.value,
+            distance: (laboratories[0] as any).distance,
+            aiExplanation: 'Ближайшая лаборатория для сдачи контрольного анализа.'
+          }
+        })
+      }
     }
 
     // 2. Рекомендации при повышенном холестерине
@@ -363,45 +367,55 @@ export async function createEnhancedRecommendationsForUser(
         ind.name.toLowerCase().includes('холестерин')
       )
 
-      // Рекомендуем диетолога
-      const nutritionists = await findNearbyCompanies('NUTRITIONIST', userLocation, 2)
-      
+      // Рекомендация по питанию (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SERVICE',
+        title: 'Коррекция питания для снижения холестерина',
+        description: 'Рекомендуется снизить потребление насыщенных жиров, увеличить клетчатку и омега-3. Рассмотрите консультацию диетолога для составления индивидуального плана питания.',
+        reason: `Повышенный уровень холестерина (${cholIndicator?.value} ${cholIndicator?.unit})`,
+        priority: 4,
+        companyId: null,
+        metadata: {
+          serviceType: 'nutrition_consultation',
+          currentValue: cholIndicator?.value,
+          aiExplanation: 'Коррекция питания (снижение насыщенных жиров, увеличение клетчатки и омега‑3) — первый шаг при гиперхолестеринемии.'
+        }
+      })
+
+      // Рекомендация по физической активности (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SERVICE',
+        title: 'Регулярные физические нагрузки',
+        description: 'Умеренная физическая активность 3-4 раза в неделю по 30-45 минут помогает снизить уровень "плохого" холестерина и повысить "хороший". Можно заниматься дома или в фитнес-центре.',
+        reason: 'Повышенный холестерин',
+        priority: 3,
+        companyId: null,
+        metadata: {
+          activityType: 'cardio',
+          frequency: '3-4 раза в неделю',
+          duration: '30-45 минут',
+          aiExplanation: 'Аэробные нагрузки улучшают липидный профиль и снижают сердечно‑сосудистые риски.'
+        }
+      })
+
+      // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
+      const nutritionists = await findNearbyCompanies('NUTRITIONIST', userLocation, 1)
       if (nutritionists.length > 0) {
         recommendations.push({
           userId,
           type: 'SERVICE',
-          title: 'Консультация диетолога для коррекции питания',
+          title: `Консультация диетолога "${nutritionists[0].name}"`,
           description: 'Специалист поможет составить индивидуальный план питания для снижения уровня холестерина.',
           reason: `Повышенный уровень холестерина (${cholIndicator?.value} ${cholIndicator?.unit})`,
-          priority: 4,
+          priority: 3,
           companyId: nutritionists[0].id,
           metadata: {
             serviceType: 'nutrition_consultation',
             currentValue: cholIndicator?.value,
             distance: (nutritionists[0] as any).distance,
-            aiExplanation: 'Коррекция питания (снижение насыщенных жиров, увеличение клетчатки и омега‑3) — первый шаг при гиперхолестеринемии.'
-          }
-        })
-      }
-
-      // Рекомендуем фитнес
-      const fitnessСenters = await findNearbyCompanies('FITNESS_CENTER', userLocation, 2)
-      
-      if (fitnessСenters.length > 0) {
-        recommendations.push({
-          userId,
-          type: 'SERVICE',
-          title: 'Регулярные физические нагрузки',
-          description: 'Умеренная физическая активность 3-4 раза в неделю помогает снизить уровень "плохого" холестерина и повысить "хороший".',
-          reason: 'Повышенный холестерин',
-          priority: 3,
-          companyId: fitnessСenters[0].id,
-          metadata: {
-            activityType: 'cardio',
-            frequency: '3-4 раза в неделю',
-            duration: '30-45 минут',
-            distance: (fitnessСenters[0] as any).distance,
-            aiExplanation: 'Аэробные нагрузки улучшают липидный профиль и снижают сердечно‑сосудистые риски.'
+            aiExplanation: 'Ближайший диетолог для консультации.'
           }
         })
       }
@@ -413,43 +427,53 @@ export async function createEnhancedRecommendationsForUser(
         ind.name.toLowerCase().includes('глюкоз')
       )
 
-      // Рекомендуем эндокринолога (клиники)
-      const clinics = await findNearbyCompanies('CLINIC', userLocation, 2)
-      
+      // Рекомендация консультации врача (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SERVICE',
+        title: 'Консультация эндокринолога',
+        description: 'Рекомендуется консультация специалиста для оценки состояния углеводного обмена и исключения сахарного диабета. Обратитесь в поликлинику или частную клинику.',
+        reason: `Повышенный уровень глюкозы (${glucoseIndicator?.value} ${glucoseIndicator?.unit})`,
+        priority: 5,
+        companyId: null,
+        metadata: {
+          specialization: 'endocrinology',
+          currentValue: glucoseIndicator?.value,
+          aiExplanation: 'Повышенная глюкоза требует очной оценки факторов риска и возможной дообследования.'
+        }
+      })
+
+      // Рекомендация анализа (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'ANALYSIS',
+        title: 'Анализ на гликированный гемоглобин (HbA1c)',
+        description: 'Этот анализ покажет средний уровень глюкозы в крови за последние 2-3 месяца. Можно сдать в любой лаборатории.',
+        reason: 'Повышенная глюкоза',
+        priority: 4,
+        companyId: null,
+        metadata: {
+          testType: 'hba1c',
+          aiExplanation: 'HbA1c отражает среднюю гликемию за 2–3 месяца и помогает подтвердить нарушение углеводного обмена.'
+        }
+      })
+
+      // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
+      const clinics = await findNearbyCompanies('CLINIC', userLocation, 1)
       if (clinics.length > 0) {
         recommendations.push({
           userId,
           type: 'SERVICE',
-          title: 'Консультация эндокринолога',
-          description: 'Рекомендуется консультация специалиста для оценки состояния углеводного обмена и исключения сахарного диабета.',
+          title: `Клиника "${clinics[0].name}" для консультации`,
+          description: 'Рекомендуется консультация эндокринолога в этой клинике.',
           reason: `Повышенный уровень глюкозы (${glucoseIndicator?.value} ${glucoseIndicator?.unit})`,
-          priority: 5,
+          priority: 4,
           companyId: clinics[0].id,
           metadata: {
             specialization: 'endocrinology',
             currentValue: glucoseIndicator?.value,
             distance: (clinics[0] as any).distance,
-            aiExplanation: 'Повышенная глюкоза требует очной оценки факторов риска и возможной дообследования.'
-          }
-        })
-      }
-
-      // Рекомендуем анализ на гликированный гемоглобин
-      const laboratories = await findNearbyCompanies('LABORATORY', userLocation, 2)
-      
-      if (laboratories.length > 0) {
-        recommendations.push({
-          userId,
-          type: 'ANALYSIS',
-          title: 'Анализ на гликированный гемоглобин (HbA1c)',
-          description: 'Этот анализ покажет средний уровень глюкозы в крови за последние 2-3 месяца.',
-          reason: 'Повышенная глюкоза',
-          priority: 4,
-          companyId: laboratories[0].id,
-          metadata: {
-            testType: 'hba1c',
-            distance: (laboratories[0] as any).distance,
-            aiExplanation: 'HbA1c отражает среднюю гликемию за 2–3 месяца и помогает подтвердить нарушение углеводного обмена.'
+            aiExplanation: 'Ближайшая клиника для консультации.'
           }
         })
       }
@@ -462,43 +486,53 @@ export async function createEnhancedRecommendationsForUser(
         ind.name.toLowerCase().includes('железо')
       )
 
-      // Рекомендуем препараты железа
-      const pharmacies = await findNearbyCompanies('PHARMACY', userLocation, 2)
-      
+      // Рекомендация препаратов железа (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SUPPLEMENT',
+        title: 'Препараты железа для коррекции анемии',
+        description: 'Рекомендуется прием препаратов железа по назначению врача. Важно: принимайте на голодный желудок и избегайте одновременного приема с кальцием и чаем. Можно приобрести в любой аптеке.',
+        reason: `Низкий уровень ${hbIndicator?.name} (${hbIndicator?.value} ${hbIndicator?.unit})`,
+        priority: 4,
+        companyId: null,
+        metadata: {
+          supplementType: 'iron',
+          currentValue: hbIndicator?.value,
+          aiExplanation: 'Пероральные препараты железа — стандарт первой линии при железодефицитной анемии.'
+        }
+      })
+
+      // Рекомендация консультации врача (без привязки к компании)
+      recommendations.push({
+        userId,
+        type: 'SERVICE',
+        title: 'Консультация терапевта',
+        description: 'Необходима консультация врача для выяснения причины анемии и назначения адекватного лечения. Обратитесь в поликлинику или частную клинику.',
+        reason: 'Низкий гемоглобин',
+        priority: 5,
+        companyId: null,
+        metadata: {
+          specialization: 'therapy',
+          aiExplanation: 'Врач оценит возможные причины анемии (дефицит железа, кровопотери и т.д.) и подберёт тактику.'
+        }
+      })
+
+      // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
+      const pharmacies = await findNearbyCompanies('PHARMACY', userLocation, 1)
       if (pharmacies.length > 0) {
         recommendations.push({
           userId,
           type: 'SUPPLEMENT',
-          title: 'Препараты железа для коррекции анемии',
-          description: 'Рекомендуется прием препаратов железа. Важно: принимайте на голодный желудок и избегайте одновременного приема с кальцием и чаем.',
+          title: `Аптека "${pharmacies[0].name}" для приобретения препаратов железа`,
+          description: 'Можете приобрести препараты железа в этой аптеке. Проконсультируйтесь с врачом перед приемом.',
           reason: `Низкий уровень ${hbIndicator?.name} (${hbIndicator?.value} ${hbIndicator?.unit})`,
-          priority: 4,
+          priority: 3,
           companyId: pharmacies[0].id,
           metadata: {
             supplementType: 'iron',
             currentValue: hbIndicator?.value,
             distance: (pharmacies[0] as any).distance,
-            aiExplanation: 'Пероральные препараты железа — стандарт первой линии при железодефицитной анемии.'
-          }
-        })
-      }
-
-      // Рекомендуем консультацию терапевта
-      const clinics = await findNearbyCompanies('CLINIC', userLocation, 2)
-      
-      if (clinics.length > 0) {
-        recommendations.push({
-          userId,
-          type: 'SERVICE',
-          title: 'Консультация терапевта',
-          description: 'Необходима консультация врача для выяснения причины анемии и назначения адекватного лечения.',
-          reason: 'Низкий гемоглобин',
-          priority: 5,
-          companyId: clinics[0].id,
-          metadata: {
-            specialization: 'therapy',
-            distance: (clinics[0] as any).distance,
-            aiExplanation: 'Врач оценит возможные причины анемии (дефицит железа, кровопотери и т.д.) и подберёт тактику.'
+            aiExplanation: 'Ближайшая аптека.'
           }
         })
       }
@@ -524,24 +558,52 @@ export async function createEnhancedRecommendationsForUser(
         ])
 
         logger.info(`Found companies: labs=${labs.length}, clinics=${clinics.length}`, 'recommendations')
-        
-        if (labs.length === 0 && clinics.length === 0) {
-          logger.error(`❌ No companies found in database! Recommendations cannot be created without companies.`, 'recommendations')
-          logger.error(`Please run: node prisma/seed-companies.js to populate companies`, 'recommendations')
-          throw new Error('No companies found in database. Please seed companies first using: node prisma/seed-companies.js')
-        }
 
         for (const a of abnormalAnalyses.slice(0, 2)) {
+          // Создаем рекомендации БЕЗ привязки к компаниям
+          recommendations.push({
+            userId,
+            type: 'ANALYSIS',
+            title: `Контрольный анализ: ${a.title || a.type}`,
+            description: 'Рекомендуем пересдать анализ для подтверждения отклонений и мониторинга динамики. Можно сдать в любой лаборатории.',
+            reason: 'Обнаружены отклонения в результатах анализа',
+            priority: 4,
+            companyId: null,
+            metadata: { 
+              analysisId: (a as any).id, 
+              aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль для подтверждения и мониторинга динамики.' 
+            }
+          })
+
+          recommendations.push({
+            userId,
+            type: 'SERVICE',
+            title: 'Консультация врача по результатам анализа',
+            description: 'Запишитесь к врачу для интерпретации отклонений и подбора тактики коррекции. Обратитесь в поликлинику или частную клинику.',
+            reason: 'Обнаружены отклонения в анализе',
+            priority: 3,
+            companyId: null,
+            metadata: { 
+              analysisId: (a as any).id, 
+              aiExplanation: 'Очная консультация нужна для выбора дальнейших шагов и исключения серьёзной патологии.' 
+            }
+          })
+
+          // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
           if (labs.length > 0) {
             recommendations.push({
               userId,
               type: 'ANALYSIS',
-              title: `Контрольный анализ: ${a.title || a.type}`,
-              description: 'Рекомендуем пересдать анализ для подтверждения отклонений и мониторинга динамики.',
+              title: `Лаборатория "${labs[0].name}" для сдачи анализа`,
+              description: `Можете сдать контрольный анализ "${a.title || a.type}" в этой лаборатории.`,
               reason: 'Обнаружены отклонения в результатах анализа',
-              priority: 4,
+              priority: 3,
               companyId: labs[0].id,
-              metadata: { analysisId: (a as any).id, distance: (labs[0] as any).distance, aiExplanation: 'Выявлены отклонения в анализе, рекомендуется контроль в ближайшей лаборатории.' }
+              metadata: { 
+                analysisId: (a as any).id, 
+                distance: (labs[0] as any).distance, 
+                aiExplanation: 'Ближайшая лаборатория для сдачи анализа.' 
+              }
             })
           }
 
@@ -549,12 +611,16 @@ export async function createEnhancedRecommendationsForUser(
             recommendations.push({
               userId,
               type: 'SERVICE',
-              title: 'Консультация врача по результатам анализа',
-              description: 'Запишитесь к врачу для интерпретации отклонений и подбора тактики коррекции.',
+              title: `Клиника "${clinics[0].name}" для консультации`,
+              description: 'Можете записаться на консультацию в эту клинику.',
               reason: 'Обнаружены отклонения в анализе',
-              priority: 3,
+              priority: 2,
               companyId: clinics[0].id,
-              metadata: { analysisId: (a as any).id, distance: (clinics[0] as any).distance, aiExplanation: 'Очная консультация нужна для выбора дальнейших шагов и исключения серьёзной патологии.' }
+              metadata: { 
+                analysisId: (a as any).id, 
+                distance: (clinics[0] as any).distance, 
+                aiExplanation: 'Ближайшая клиника для консультации.' 
+              }
             })
           }
         }
@@ -562,6 +628,34 @@ export async function createEnhancedRecommendationsForUser(
         // Если есть анализы или документы, но нет отклонений - создаем общие рекомендации
         logger.info(`Creating general recommendations for user with analyses/documents`, 'recommendations')
         
+        // Создаем общие рекомендации БЕЗ привязки к компаниям
+        recommendations.push({
+          userId,
+          type: 'ANALYSIS',
+          title: 'Плановый профилактический осмотр',
+          description: 'Рекомендуем регулярно проходить профилактические обследования для поддержания здоровья. Можно сдать в любой лаборатории.',
+          reason: 'Профилактика и раннее выявление заболеваний',
+          priority: 2,
+          companyId: null,
+          metadata: { 
+            aiExplanation: 'Регулярные профилактические обследования помогают выявить проблемы на ранней стадии.' 
+          }
+        })
+
+        recommendations.push({
+          userId,
+          type: 'SERVICE',
+          title: 'Консультация врача для профилактики',
+          description: 'Регулярные консультации с врачом помогают поддерживать здоровье и своевременно выявлять проблемы. Обратитесь в поликлинику или частную клинику.',
+          reason: 'Профилактика и поддержание здоровья',
+          priority: 2,
+          companyId: null,
+          metadata: { 
+            aiExplanation: 'Профилактические визиты к врачу важны для поддержания здоровья.' 
+          }
+        })
+
+        // Если есть компании - добавляем их как дополнительные рекомендации (опционально)
         const [labs, clinics] = await Promise.all([
           findNearbyCompanies('LABORATORY', userLocation, 1),
           findNearbyCompanies('CLINIC', userLocation, 1)
@@ -573,14 +667,14 @@ export async function createEnhancedRecommendationsForUser(
           recommendations.push({
             userId,
             type: 'ANALYSIS',
-            title: 'Плановый профилактический осмотр',
-            description: 'Рекомендуем регулярно проходить профилактические обследования для поддержания здоровья.',
+            title: `Лаборатория "${labs[0].name}" для профилактического осмотра`,
+            description: 'Можете пройти профилактическое обследование в этой лаборатории.',
             reason: 'Профилактика и раннее выявление заболеваний',
-            priority: 2,
+            priority: 1,
             companyId: labs[0].id,
             metadata: { 
               distance: (labs[0] as any).distance, 
-              aiExplanation: 'Регулярные профилактические обследования помогают выявить проблемы на ранней стадии.' 
+              aiExplanation: 'Ближайшая лаборатория для профилактического обследования.' 
             }
           })
         }
@@ -589,14 +683,14 @@ export async function createEnhancedRecommendationsForUser(
           recommendations.push({
             userId,
             type: 'SERVICE',
-            title: 'Консультация врача для профилактики',
-            description: 'Регулярные консультации с врачом помогают поддерживать здоровье и своевременно выявлять проблемы.',
+            title: `Клиника "${clinics[0].name}" для профилактической консультации`,
+            description: 'Можете записаться на профилактическую консультацию в эту клинику.',
             reason: 'Профилактика и поддержание здоровья',
-            priority: 2,
+            priority: 1,
             companyId: clinics[0].id,
             metadata: { 
               distance: (clinics[0] as any).distance, 
-              aiExplanation: 'Профилактические визиты к врачу важны для поддержания здоровья.' 
+              aiExplanation: 'Ближайшая клиника для профилактической консультации.' 
             }
           })
         }
