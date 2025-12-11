@@ -77,8 +77,7 @@ export async function GET(request: NextRequest) {
       // Добавляем точное совпадение
       cityConditions.push({
         city: {
-          equals: city,
-          mode: 'insensitive' as const
+          equals: city
         }
       })
       
