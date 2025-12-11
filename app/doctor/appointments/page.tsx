@@ -579,6 +579,8 @@ export default function DoctorAppointmentsPage() {
                     <Button variant="outline" onClick={()=>setIsCreateOpen(false)}>Отмена</Button>
                     <Button onClick={async ()=>{
                       try {
+                        if (!formState.patientId) { alert('Выберите пациента'); return }
+                        if (!formState.date || !formState.time) { alert('Выберите дату и время'); return }
                         const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
                         const scheduledAt = new Date(`${formState.date}T${formState.time}:00`)
                         const res = await fetch('/api/doctor/appointments', {
