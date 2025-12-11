@@ -14,7 +14,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { patientId, entryDate, mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes, tags } = body
 
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'diary_write' })
-  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  }
 
   const existing = await prisma.healthDiaryEntry.findUnique({ where: { id: params.id }, select: { id: true, userId: true } })
   if (!existing || existing.userId !== resolved.patientId) {
@@ -53,7 +55,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { searchParams } = new URL(req.url)
   const patientIdParam = searchParams.get('patientId')
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: patientIdParam, capability: 'diary_write' })
-  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  }
 
   const existing = await prisma.healthDiaryEntry.findUnique({ where: { id: params.id }, select: { id: true, userId: true } })
   if (!existing || existing.userId !== resolved.patientId) {

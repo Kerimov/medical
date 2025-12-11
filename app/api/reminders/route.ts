@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_read' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const reminders = await prisma.reminder.findMany({
       where: { userId: resolved.patientId },
@@ -73,7 +75,9 @@ export async function POST(request: NextRequest) {
     }
 
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'reminders_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const reminder = await prisma.reminder.create({
       data: {

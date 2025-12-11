@@ -19,7 +19,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json().catch(() => ({}))
     const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const existing = await prisma.patientMedication.findFirst({ where: { id: params.id, userId: resolved.patientId } })
     if (!existing) return NextResponse.json({ error: 'Не найдено' }, { status: 404 })
@@ -63,7 +65,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { searchParams } = new URL(req.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const existing = await prisma.patientMedication.findFirst({ where: { id: params.id, userId: resolved.patientId } })
     if (!existing) return NextResponse.json({ error: 'Не найдено' }, { status: 404 })

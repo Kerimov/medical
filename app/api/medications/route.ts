@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_read' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const list = await prisma.patientMedication.findMany({
       where: { userId: resolved.patientId },
@@ -42,7 +44,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     if (!name) return NextResponse.json({ error: 'name обязателен' }, { status: 400 })

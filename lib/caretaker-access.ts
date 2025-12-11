@@ -3,6 +3,10 @@ import type { TokenPayload } from '@/lib/auth'
 
 export type CareCapability = 'diary_read' | 'diary_write' | 'medications_read' | 'medications_write' | 'reminders_read' | 'reminders_write'
 
+export type ResolvePatientOk = { ok: true; patientId: string }
+export type ResolvePatientErr = { ok: false; status: number; error: string }
+export type ResolvePatientResult = ResolvePatientOk | ResolvePatientErr
+
 function can(permissions: any, cap: CareCapability): boolean {
   const p = permissions || {}
   if (cap === 'diary_read') return !!p?.diary?.read
@@ -18,13 +22,13 @@ export async function resolvePatientId(params: {
   payload: TokenPayload
   requestedPatientId: string | null
   capability: CareCapability
-}): Promise<{ ok: true; patientId: string } | { ok: false; status: number; error: string }> {
+}): Promise<ResolvePatientResult> {
   const userId = params.payload?.userId
-  if (!userId) return { ok: false, status: 401, error: 'Не авторизован' }
+  if (!userId) return { ok: false as const, status: 401, error: 'Не авторизован' }
 
   const requested = (params.requestedPatientId || '').trim()
   if (!requested || requested === userId) {
-    return { ok: true, patientId: userId }
+    return { ok: true as const, patientId: userId }
   }
 
   // caretaker access check
@@ -33,10 +37,10 @@ export async function resolvePatientId(params: {
     select: { id: true, permissions: true }
   })
 
-  if (!link) return { ok: false, status: 403, error: 'Нет доступа к данным пациента' }
-  if (!can(link.permissions, params.capability)) return { ok: false, status: 403, error: 'Недостаточно прав (caretaker)' }
+  if (!link) return { ok: false as const, status: 403, error: 'Нет доступа к данным пациента' }
+  if (!can(link.permissions, params.capability)) return { ok: false as const, status: 403, error: 'Недостаточно прав (caretaker)' }
 
-  return { ok: true, patientId: requested }
+  return { ok: true as const, patientId: requested }
 }
 
 

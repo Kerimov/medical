@@ -77,7 +77,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const patientIdParam = typeof body?.patientId === 'string' ? body.patientId : null
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'medications_read' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const createReminders = body?.createReminders !== false
     const channels = Array.isArray(body?.channels) ? body.channels : ['PUSH']

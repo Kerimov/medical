@@ -26,7 +26,9 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_read' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     const reminder = await prisma.reminder.findFirst({
       where: { 
@@ -78,7 +80,9 @@ export async function PUT(
     } = body
 
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'reminders_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     // Проверяем, что напоминание принадлежит пользователю
     const existingReminder = await prisma.reminder.findFirst({
@@ -130,7 +134,9 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const patientIdParam = searchParams.get('patientId')
     const resolved = await resolvePatientId({ payload: decoded, requestedPatientId: patientIdParam, capability: 'reminders_write' })
-    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+    }
 
     // Проверяем, что напоминание принадлежит пользователю
     const existingReminder = await prisma.reminder.findFirst({

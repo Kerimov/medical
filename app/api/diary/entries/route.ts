@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
   const order = (searchParams.get('order') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc'
 
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: patientIdParam, capability: 'diary_read' })
-  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  }
 
   const where: any = { userId: resolved.patientId }
   if (from || to) where.entryDate = {
@@ -46,7 +48,9 @@ export async function POST(req: NextRequest) {
   const { patientId, entryDate, mood, painScore, sleepHours, steps, temperature, weight, systolic, diastolic, pulse, symptoms, notes, tags } = body
 
   const resolved = await resolvePatientId({ payload: user, requestedPatientId: typeof patientId === 'string' ? patientId : null, capability: 'diary_write' })
-  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status })
+  }
 
   const entry = await prisma.healthDiaryEntry.create({
     data: {
