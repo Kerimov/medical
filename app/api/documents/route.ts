@@ -3,6 +3,10 @@ import { prisma } from '@/lib/db'
 import { verifyToken } from '@/lib/auth'
 import { parse as parseCookies } from 'cookie'
 
+// Маршрут использует request.headers (cookie), поэтому его нужно пометить как динамический,
+// чтобы Next.js не пытался выполнять его при статическом экспорте.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Получаем токен из cookies
