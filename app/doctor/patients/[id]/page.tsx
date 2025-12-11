@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,8 @@ interface PatientCardData {
   appointments: any[]
   prescriptions: any[]
   notes: any[]
+  documents?: any[]
+  carePlanTasks?: any[]
 }
 
 export default function PatientCardPage() {
@@ -31,6 +34,9 @@ export default function PatientCardPage() {
   const [analysisCategory, setAnalysisCategory] = useState<string>('Все')
   const [selectedAnalyses, setSelectedAnalyses] = useState<Record<string, boolean>>({})
   const [compareResult, setCompareResult] = useState<{ indicators?: Record<string, { analysisId: string; date: string; value: number; unit?: string|null }[]>; insights?: string } | null>(null)
+  const [timelineMode, setTimelineMode] = useState<'all' | 'important'>('all')
+  const [problemDraft, setProblemDraft] = useState<string>('')
+  const [problemSaving, setProblemSaving] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +45,9 @@ export default function PatientCardPage() {
         if (res.ok) {
           const json = await res.json()
           setData(json)
+          const notes = Array.isArray(json?.notes) ? json.notes : []
+          const latestProblem = notes.find((n: any) => String(n?.noteType || '').toLowerCase() === 'problem_list')
+          if (latestProblem?.content) setProblemDraft(String(latestProblem.content))
         }
       } finally {
         setLoading(false)
@@ -90,7 +99,80 @@ export default function PatientCardPage() {
 
   if (!data) return null
 
-  const { patient, patientRecord, analyses, recommendations, appointments, prescriptions, notes } = data
+  const { patient, patientRecord, analyses, recommendations, appointments, prescriptions, notes, documents = [], carePlanTasks = [] } = data
+
+  const timeline: Array<{ ts: number; kind: string; title: string; meta?: string }> = []
+  for (const a of Array.isArray(appointments) ? appointments : []) {
+    const ts = new Date(a.scheduledAt).getTime()
+    if (!Number.isFinite(ts)) continue
+    timeline.push({
+      ts,
+      kind: 'appointment',
+      title: `Приём (${a.appointmentType || '—'})`,
+      meta: `${new Date(a.scheduledAt).toLocaleString('ru-RU')} • ${a.status}`
+    })
+  }
+  for (const an of Array.isArray(analyses) ? analyses : []) {
+    const ts = new Date(an.date).getTime()
+    if (!Number.isFinite(ts)) continue
+    timeline.push({
+      ts,
+      kind: 'analysis',
+      title: `Анализ: ${an.title || an.type || '—'}`,
+      meta: `${new Date(an.date).toLocaleDateString('ru-RU')} • ${an.status}`
+    })
+  }
+  for (const d of Array.isArray(documents) ? documents : []) {
+    const ts = new Date(d.uploadDate).getTime()
+    if (!Number.isFinite(ts)) continue
+    timeline.push({
+      ts,
+      kind: 'document',
+      title: `Документ: ${d.fileName || '—'}`,
+      meta: `${new Date(d.uploadDate).toLocaleDateString('ru-RU')} • ${d.studyType || d.category || ''}`.trim()
+    })
+  }
+  for (const t of Array.isArray(carePlanTasks) ? carePlanTasks : []) {
+    const ts = new Date(t.createdAt || t.updatedAt || Date.now()).getTime()
+    if (!Number.isFinite(ts)) continue
+    const due = t.snoozedUntil || t.dueAt
+    const dueStr = due ? ` • срок: ${new Date(due).toLocaleDateString('ru-RU')}` : ''
+    timeline.push({
+      ts,
+      kind: 'careplan',
+      title: `Задача плана: ${t.title}`,
+      meta: `${t.status}${dueStr}`
+    })
+  }
+  timeline.sort((a, b) => b.ts - a.ts)
+  const timelineShown =
+    timelineMode === 'important'
+      ? timeline.filter((x) => x.kind !== 'document').slice(0, 25)
+      : timeline.slice(0, 35)
+
+  async function saveProblemList() {
+    try {
+      setProblemSaving(true)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const res = await fetch(`/api/doctor/patients/${patient.id}/problem-list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(lsToken ? { Authorization: `Bearer ${lsToken}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({ content: problemDraft })
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j?.error || 'Ошибка сохранения')
+      const re = await fetch(`/api/doctor/patients/${patient.id}`, { credentials: 'include' })
+      if (re.ok) setData(await re.json())
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setProblemSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
@@ -193,6 +275,61 @@ export default function PatientCardPage() {
                    patientRecord?.status === 'cancelled' ? 'Отменен' : 
                    patientRecord?.status || '—'}
                 </Badge></div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-effect border-0 shadow-medical lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Таймлайн</CardTitle>
+              <CardDescription>Приёмы + анализы + документы + задачи плана</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-muted-foreground">Режим</div>
+                  <select className="border rounded px-2 py-1 text-sm" value={timelineMode} onChange={(e) => setTimelineMode(e.target.value as any)}>
+                    <option value="all">Все</option>
+                    <option value="important">Важное</option>
+                  </select>
+                </div>
+                <Link href={`/doctor/patients/${patient.id}/edit`} className="text-sm text-primary hover:underline">Редактировать карточку</Link>
+              </div>
+
+              {timelineShown.length === 0 ? (
+                <div className="text-sm text-muted-foreground">Нет событий</div>
+              ) : (
+                <div className="space-y-2">
+                  {timelineShown.map((e, idx) => (
+                    <div key={`${e.kind}-${e.ts}-${idx}`} className="p-3 rounded-lg bg-white/70 border flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium">{e.title}</div>
+                        <div className="text-xs text-muted-foreground">{e.meta}</div>
+                      </div>
+                      <Badge variant="outline">{e.kind}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle>Problem list (врач)</CardTitle>
+              <CardDescription>Коротко: проблемы/гипотезы/что уточнить. Сохраняется с историей.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <textarea
+                className="w-full min-h-[180px] border rounded p-2 text-sm"
+                value={problemDraft}
+                onChange={(e) => setProblemDraft(e.target.value)}
+                placeholder="- Проблема 1 (severity)\n  - данные: ...\n  - вопросы: ..."
+              />
+              <div className="flex justify-end mt-3">
+                <Button onClick={saveProblemList} disabled={problemSaving}>
+                  {problemSaving ? 'Сохраняю...' : 'Сохранить'}
+                </Button>
               </div>
             </CardContent>
           </Card>

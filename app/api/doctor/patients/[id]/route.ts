@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       }
     }
 
-    const [patient, analyses, recommendations, appointments, prescriptions, notes] = await Promise.all([
+    const [patient, analyses, recommendations, appointments, prescriptions, notes, documents, carePlanTasks] = await Promise.all([
       prisma.user.findUnique({
         where: { id: patientId },
         select: { id: true, name: true, email: true, createdAt: true }
@@ -79,6 +79,18 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       prisma.medicalNote.findMany({
         where: patientRecord ? { patientRecordId: patientRecord.id } : { patientRecordId: '' },
         orderBy: { createdAt: 'desc' }
+      }),
+      prisma.document.findMany({
+        where: { userId: patientId },
+        select: { id: true, fileName: true, uploadDate: true, category: true, studyDate: true, studyType: true, laboratory: true, doctor: true },
+        orderBy: { uploadDate: 'desc' },
+        take: 30
+      }),
+      prisma.carePlanTask.findMany({
+        where: { userId: patientId },
+        select: { id: true, title: true, status: true, dueAt: true, snoozedUntil: true, createdAt: true, updatedAt: true, analysisId: true, documentId: true },
+        orderBy: { createdAt: 'desc' },
+        take: 50
       })
     ])
 
@@ -89,7 +101,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       recommendations,
       appointments,
       prescriptions,
-      notes
+      notes,
+      documents,
+      carePlanTasks
     })
   } catch (error) {
     console.error('Error fetching patient card data:', error)
