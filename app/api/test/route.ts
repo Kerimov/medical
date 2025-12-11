@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 
+// Этот тестовый маршрут использует базу данных, поэтому помечаем его как динамический,
+// чтобы Next.js не пытался выполнять его на этапе статического экспорта.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     // Простой тест подключения к базе данных
