@@ -561,9 +561,13 @@ export default function DoctorAppointmentsPage() {
                         }}
                       >
                         <option value="" disabled>Выберите пациента</option>
-                        {patients.map(p => (
-                          <option key={p.id} value={p.id}>{p.name} {p.email ? `• ${p.email}` : ''}</option>
-                        ))}
+                        {patients
+                          .filter((p: any) => p && typeof p === 'object')
+                          .map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p?.name || '—'} {p?.email ? `• ${p.email}` : ''}
+                            </option>
+                          ))}
                       </select>
                     </div>
                     <div>

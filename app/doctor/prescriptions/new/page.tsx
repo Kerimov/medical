@@ -149,9 +149,9 @@ export default function NewPrescriptionPage() {
                   <SelectValue placeholder="Выберите пациента" />
                 </SelectTrigger>
                 <SelectContent>
-                  {patients.map((p) => (
+                  {patients.filter((p) => p && typeof p === 'object').map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.name}{p.email ? ` (${p.email})` : ''}
+                      {p?.name || '—'}{p?.email ? ` (${p.email})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

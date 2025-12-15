@@ -565,9 +565,9 @@ export default function DoctorDashboard() {
                       <SelectValue placeholder="Выберите пациента" />
                     </SelectTrigger>
                     <SelectContent>
-                      {patients.map((p) => (
+                      {patients.filter((p) => p && typeof p === 'object').map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name}{p.email ? ` (${p.email})` : ''}
+                          {p?.name || '—'}{p?.email ? ` (${p.email})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -650,9 +650,9 @@ export default function DoctorDashboard() {
                       <SelectValue placeholder="Выберите пациента" />
                     </SelectTrigger>
                     <SelectContent>
-                      {patients.map((p) => (
+                      {patients.filter((p) => p && typeof p === 'object').map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name}{p.email ? ` (${p.email})` : ''}
+                          {p?.name || '—'}{p?.email ? ` (${p.email})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
