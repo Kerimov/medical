@@ -21,6 +21,9 @@ import {
   CalendarPlus
 } from 'lucide-react'
 import Link from 'next/link'
+import { CLINICAL_PROTOCOLS } from '@/lib/clinical-protocols'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 interface DoctorStats {
   totalPatients: number
@@ -45,6 +48,13 @@ export default function DoctorDashboard() {
   const [reportOpen, setReportOpen] = useState(false)
   const [reportMarkdown, setReportMarkdown] = useState<string>('')
   const [reportBusyId, setReportBusyId] = useState<string | null>(null)
+
+  const [patients, setPatients] = useState<Array<{ id: string; name: string; email?: string }>>([])
+  const [protocolPatientId, setProtocolPatientId] = useState<string>('')
+  const [protocolKey, setProtocolKey] = useState<string>('hypertension')
+  const [protocolStart, setProtocolStart] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [protocolNote, setProtocolNote] = useState<string>('')
+  const [protocolBusy, setProtocolBusy] = useState<boolean>(false)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -123,6 +133,19 @@ export default function DoctorDashboard() {
         setDay(null)
         setDayError('Ошибка загрузки дня')
       }
+
+      // Patients for protocol dropdown
+      try {
+        const pRes = await fetch('/api/doctor/patients', { headers, credentials: 'include' })
+        const pJson = await pRes.json().catch(() => ({}))
+        if (pRes.ok) {
+          const list = Array.isArray(pJson?.patients) ? pJson.patients : []
+          setPatients(list)
+          if (!protocolPatientId && list.length === 1) setProtocolPatientId(list[0].id)
+        }
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       console.error('Error fetching doctor stats:', error)
     } finally {
@@ -177,6 +200,39 @@ export default function DoctorDashboard() {
       alert(e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setReportBusyId(null)
+    }
+  }
+
+  async function applyProtocol() {
+    if (!protocolPatientId) {
+      alert('Выберите пациента')
+      return
+    }
+    try {
+      setProtocolBusy(true)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const headers = lsToken
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${lsToken}` }
+        : { 'Content-Type': 'application/json' }
+      const res = await fetch('/api/doctor/protocols/apply', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          patientId: protocolPatientId,
+          protocolKey,
+          startDate: protocolStart ? new Date(protocolStart).toISOString() : new Date().toISOString(),
+          note: protocolNote || '',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      alert(`Создано задач на согласование: ${data?.createdCount || 0}`)
+      setProtocolNote('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setProtocolBusy(false)
     }
   }
 
@@ -433,6 +489,91 @@ export default function DoctorDashboard() {
                     <span>Рецепты</span>
                   </Button>
                 </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Clinical Protocols */}
+        <div className="mt-8">
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                Клинические протоколы (шаблоны)
+              </CardTitle>
+              <CardDescription>
+                Быстрые планы обследований/контроля. Создаёт задачи пациенту на согласование.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Пациент</div>
+                  <Select value={protocolPatientId} onValueChange={setProtocolPatientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите пациента" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patients.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.email ? ` (${p.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Шаблон</div>
+                  <Select value={protocolKey} onValueChange={setProtocolKey}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите протокол" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLINICAL_PROTOCOLS.map((p) => (
+                        <SelectItem key={p.key} value={p.key}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Старт</div>
+                  <input
+                    type="date"
+                    value={protocolStart}
+                    onChange={(e) => setProtocolStart(e.target.value)}
+                    className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-white/60 p-4">
+                <div className="text-sm font-medium mb-1">Что будет создано</div>
+                <div className="text-xs text-muted-foreground mb-3">
+                  {CLINICAL_PROTOCOLS.find((p) => p.key === protocolKey)?.summary || '—'}
+                </div>
+                <div className="space-y-2">
+                  {(CLINICAL_PROTOCOLS.find((p) => p.key === protocolKey)?.items || []).map((it) => (
+                    <div key={it.key} className="text-sm">
+                      <div className="font-medium">{it.title}</div>
+                      {it.description ? <div className="text-xs text-muted-foreground">{it.description}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Комментарий (опционально)</div>
+                <Textarea value={protocolNote} onChange={(e) => setProtocolNote(e.target.value)} placeholder="Напр. учесть сопутствующие заболевания/жалобы..." />
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={applyProtocol} disabled={protocolBusy} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+                  {protocolBusy ? 'Создаю…' : 'Сформировать план (на согласование)'}
+                </Button>
               </div>
             </CardContent>
           </Card>

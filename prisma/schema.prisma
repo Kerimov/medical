@@ -67,6 +67,12 @@ enum CarePlanTaskStatus {
   COMPLETED
 }
 
+enum CarePlanApprovalStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
 enum CarePlanCheckInType {
   COMPLETE
   SNOOZE
@@ -118,6 +124,7 @@ model DoctorProfile {
   appointments      Appointment[]
   preVisitQuestionnaires PreVisitQuestionnaire[]
   doctorReports     DoctorReport[]
+  createdCarePlanTasks CarePlanTask[] @relation("CarePlanTasksCreatedByDoctor")
 }
 
 model PatientRecord {
@@ -370,6 +377,9 @@ model CarePlanTask {
   documentId   String?
   document     Document?          @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
+  createdByDoctorId String?
+  createdByDoctor   DoctorProfile? @relation("CarePlanTasksCreatedByDoctor", fields: [createdByDoctorId], references: [id], onDelete: SetNull)
+
   title        String
   description  String?
   status       CarePlanTaskStatus @default(ACTIVE)
@@ -379,11 +389,20 @@ model CarePlanTask {
   reminderId   String?
   snoozedUntil DateTime?
 
+  approvalStatus       CarePlanApprovalStatus @default(APPROVED)
+  approvalRequestedAt  DateTime?
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  protocolKey          String?
+
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   checkIns     CarePlanCheckIn[]
 
   @@index([userId, status])
+  @@index([userId, approvalStatus])
+  @@index([createdByDoctorId, createdAt])
   @@index([analysisId])
   @@index([documentId])
 }

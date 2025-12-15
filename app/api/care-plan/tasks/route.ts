@@ -28,10 +28,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = normalizeStatus(searchParams.get('status'))
+    const includePending = searchParams.get('includePending') === 'true'
 
     const tasks = await prisma.carePlanTask.findMany({
       where: {
         userId: payload.userId,
+        ...(!includePending ? { approvalStatus: 'APPROVED' } : {}),
         ...(status ? { status } : {})
       },
       include: {

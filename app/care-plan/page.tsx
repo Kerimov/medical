@@ -25,6 +25,17 @@ type Task = {
   createdAt: string
 }
 
+type PendingApproval = {
+  id: string
+  title: string
+  description?: string | null
+  dueAt?: string | null
+  recurrence?: string | null
+  protocolKey?: string | null
+  approvalRequestedAt?: string | null
+  doctorName?: string | null
+}
+
 function statusLabel(s: TaskStatus) {
   if (s === 'ACTIVE') return 'Активно'
   if (s === 'SNOOZED') return 'Отложено'
@@ -42,6 +53,7 @@ export default function CarePlanPage() {
   const router = useRouter()
 
   const [tasks, setTasks] = useState<Task[]>([])
+  const [pending, setPending] = useState<PendingApproval[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -75,11 +87,50 @@ export default function CarePlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token])
 
+  async function fetchPendingApprovals() {
+    if (!token) return
+    try {
+      const res = await fetch('/api/care-plan/approvals', { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      setPending(Array.isArray(data?.tasks) ? data.tasks : [])
+    } catch (e) {
+      // approvals не должны ломать страницу
+      console.warn('Failed to load approvals', e)
+      setPending([])
+    }
+  }
+
+  useEffect(() => {
+    if (user && token) fetchPendingApprovals()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token])
+
   const grouped = useMemo(() => {
     const by: Record<TaskStatus, Task[]> = { ACTIVE: [], SNOOZED: [], COMPLETED: [] }
     for (const t of tasks) by[t.status]?.push(t)
     return by
   }, [tasks])
+
+  async function decideApproval(taskId: string, decision: 'approve' | 'reject', reason?: string) {
+    if (!token) return
+    setBusyId(taskId)
+    try {
+      const res = await fetch('/api/care-plan/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        body: JSON.stringify({ taskId, decision, reason: reason || '' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      await Promise.all([fetchTasks(), fetchPendingApprovals()])
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   async function patchTask(taskId: string, body: any) {
     if (!token) return
@@ -131,6 +182,59 @@ export default function CarePlanPage() {
 
         {error && (
           <div className="text-sm text-destructive">{error}</div>
+        )}
+
+        {/* Pending approvals */}
+        {pending.length > 0 && (
+          <Card className="bg-white/70 border">
+            <CardHeader>
+              <CardTitle className="text-base">Согласование от врача</CardTitle>
+              <CardDescription>Врач предложил план обследований/контроля. Примите или отклоните.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pending.map((p) => (
+                <div key={p.id} className="p-4 border rounded-lg bg-background/60 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{p.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.doctorName ? `Доктор: ${p.doctorName}` : 'Доктор: —'}
+                        {p.protocolKey ? ` • Протокол: ${p.protocolKey}` : ''}
+                      </div>
+                      {p.description ? (
+                        <div className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{p.description}</div>
+                      ) : null}
+                    </div>
+                    <Badge className="bg-purple-100 text-purple-800">Ожидает</Badge>
+                  </div>
+
+                  {p.dueAt ? (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4" />
+                      Срок: {new Date(p.dueAt).toLocaleDateString('ru-RU')}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button size="sm" disabled={busyId === p.id} onClick={() => decideApproval(p.id, 'approve')}>
+                      Принять
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === p.id}
+                      onClick={() => {
+                        const r = prompt('Почему отклоняете? (минимум 3 символа)') || ''
+                        decideApproval(p.id, 'reject', r)
+                      }}
+                    >
+                      Отклонить
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
         {/* Quick stats */}
