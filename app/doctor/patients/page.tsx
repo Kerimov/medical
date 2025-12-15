@@ -159,17 +159,19 @@ export default function DoctorPatients() {
 
         {/* Patients List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPatients.map((patient) => (
+          {filteredPatients
+            .filter((p: any) => p && typeof p === 'object')
+            .map((patient) => (
             <Card key={patient.id} className="glass-effect border-0 shadow-medical hover:shadow-medical-lg transition-all duration-300">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                      {patient.name.charAt(0)}
+                      {String((patient as any)?.name || '?').charAt(0)}
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{patient.name}</CardTitle>
-                      <CardDescription>{patient.email}</CardDescription>
+                      <CardTitle className="text-lg">{(patient as any)?.name || '—'}</CardTitle>
+                      <CardDescription>{(patient as any)?.email || '—'}</CardDescription>
                     </div>
                   </div>
                   <Badge className={getStatusColor(patient.status)}>

@@ -408,14 +408,16 @@ export default function DoctorDashboard() {
             <CardContent>
               {stats?.recentPatients?.length ? (
                 <div className="space-y-4">
-                  {stats.recentPatients.map((patient: any) => (
+                  {stats.recentPatients
+                    .filter((p: any) => p && typeof p === 'object')
+                    .map((patient: any) => (
                     <div key={patient.id} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-white font-semibold">
-                          {patient.name.charAt(0)}
+                          {String(patient?.name || '?').charAt(0)}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">{patient.name}</p>
+                          <p className="font-medium text-gray-900">{patient?.name || '—'}</p>
                           <p className="text-sm text-gray-500">{patient.recordType}</p>
                         </div>
                       </div>
