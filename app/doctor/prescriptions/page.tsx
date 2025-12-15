@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, Plus, Printer, PauseCircle, RotateCcw } from 'lucide-react'
 
 type Prescription = {
   id: string
@@ -29,6 +29,7 @@ export default function DoctorPrescriptionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<Prescription[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login')
@@ -74,6 +75,26 @@ export default function DoctorPrescriptionsPage() {
 
   if (!user) return null
 
+  async function patchPrescription(id: string, body: any) {
+    if (!token) return
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/doctor/prescriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        body: JSON.stringify(body)
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      await fetchPrescriptions()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
       <div className="container mx-auto px-4 py-8 space-y-6">
@@ -83,6 +104,12 @@ export default function DoctorPrescriptionsPage() {
             <p className="text-muted-foreground">Список назначений из карточек пациентов.</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/doctor/prescriptions/new">
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Новое назначение
+              </Button>
+            </Link>
             <Link href="/doctor">
               <Button variant="outline" className="flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -103,7 +130,7 @@ export default function DoctorPrescriptionsPage() {
               </span>
               <Badge variant="secondary">{items.length}</Badge>
             </CardTitle>
-            <CardDescription>Создание/редактирование добавим следующим шагом.</CardDescription>
+            <CardDescription>Создавайте/продлевайте/закрывайте назначения и печатайте лист назначений.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {items.length === 0 ? (
@@ -123,6 +150,7 @@ export default function DoctorPrescriptionsPage() {
                   {p.instructions ? <div className="text-sm">{p.instructions}</div> : null}
                   <div className="text-xs text-muted-foreground flex flex-wrap gap-2">
                     <span>Назначен: {new Date(p.prescribedAt).toLocaleDateString('ru-RU')}</span>
+                    {p.expiresAt ? <span>Срок до: {new Date(p.expiresAt).toLocaleDateString('ru-RU')}</span> : null}
                     {p.patient ? (
                       <span>
                         Пациент:{' '}
@@ -131,6 +159,51 @@ export default function DoctorPrescriptionsPage() {
                         </Link>
                       </span>
                     ) : null}
+                  </div>
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    {p.patient ? (
+                      <Link href={`/doctor/prescriptions/print?patientId=${encodeURIComponent(p.patient.id)}`}>
+                        <Button size="sm" variant="outline" className="flex items-center gap-2">
+                          <Printer className="h-4 w-4" />
+                          Лист назначений
+                        </Button>
+                      </Link>
+                    ) : null}
+                    {p.isActive ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === p.id}
+                        onClick={() => patchPrescription(p.id, { action: 'close' })}
+                        className="flex items-center gap-2"
+                      >
+                        <PauseCircle className="h-4 w-4" />
+                        Закрыть
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === p.id}
+                        onClick={() => patchPrescription(p.id, { action: 'reopen' })}
+                        className="flex items-center gap-2"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Возобновить
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyId === p.id}
+                      onClick={() => {
+                        const d = prompt('Новый срок (YYYY-MM-DD). Можно пусто, чтобы убрать срок.') || ''
+                        const iso = d.trim() ? new Date(d.trim()).toISOString() : null
+                        patchPrescription(p.id, { action: 'extend', expiresAt: iso })
+                      }}
+                    >
+                      Продлить
+                    </Button>
                   </div>
                 </div>
               ))
