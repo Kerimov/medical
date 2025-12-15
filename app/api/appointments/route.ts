@@ -184,6 +184,56 @@ export async function POST(request: NextRequest) {
 
     console.log('Appointment created:', appointment.id, 'for patient:', user.name, 'with doctor:', doctor.user.name)
 
+    // Авто-напоминания пациенту: до/после приёма (без фоновых задач)
+    try {
+      const pref = await prisma.reminderPreference.findUnique({ where: { userId: decoded.userId }, select: { email: true, push: true, sms: true } })
+      const channels = [pref?.email ? 'EMAIL' : null, pref?.push ? 'PUSH' : null, pref?.sms ? 'SMS' : null].filter(Boolean)
+
+      const pre48 = new Date(appointmentDate.getTime() - 48 * 60 * 60 * 1000)
+      if (pre48.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: decoded.userId,
+            title: 'Подготовка к приёму: заполните анкету',
+            description: 'За 24–48 часов до приёма заполните анкету. Откройте: /my-appointments',
+            dueAt: pre48,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+
+      const pre2 = new Date(appointmentDate.getTime() - 2 * 60 * 60 * 1000)
+      if (pre2.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: decoded.userId,
+            title: 'Приём скоро',
+            description: 'Через 2 часа приём. Откройте: /my-appointments',
+            dueAt: pre2,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+
+      const post24 = new Date(appointmentDate.getTime() + 24 * 60 * 60 * 1000)
+      if (post24.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: decoded.userId,
+            title: 'После приёма',
+            description: 'Добавьте кратко самочувствие/итоги визита в дневник и проверьте назначения. Откройте: /diary',
+            dueAt: post24,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to create appointment reminders', e)
+    }
+
     return NextResponse.json({
       message: 'Запись на прием создана успешно',
       appointment

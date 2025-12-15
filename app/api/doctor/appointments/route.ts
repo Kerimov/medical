@@ -143,6 +143,56 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Авто-напоминания пациенту: до/после приёма (без фоновых задач)
+    try {
+      const pref = await prisma.reminderPreference.findUnique({ where: { userId: patient.id }, select: { email: true, push: true, sms: true } })
+      const channels = [pref?.email ? 'EMAIL' : null, pref?.push ? 'PUSH' : null, pref?.sms ? 'SMS' : null].filter(Boolean)
+
+      const pre48 = new Date(when.getTime() - 48 * 60 * 60 * 1000)
+      if (pre48.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: patient.id,
+            title: 'Подготовка к приёму: заполните анкету',
+            description: `За 24–48 часов до приёма заполните анкету. Откройте: /my-appointments`,
+            dueAt: pre48,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+
+      const pre2 = new Date(when.getTime() - 2 * 60 * 60 * 1000)
+      if (pre2.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: patient.id,
+            title: 'Приём скоро',
+            description: `Через 2 часа приём у врача. Откройте: /my-appointments`,
+            dueAt: pre2,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+
+      const post24 = new Date(when.getTime() + 24 * 60 * 60 * 1000)
+      if (post24.getTime() > Date.now()) {
+        await prisma.reminder.create({
+          data: {
+            userId: patient.id,
+            title: 'После приёма',
+            description: 'Добавьте кратко самочувствие/итоги визита в дневник и проверьте назначения. Откройте: /diary',
+            dueAt: post24,
+            recurrence: 'NONE',
+            channels: channels.length ? channels : ['PUSH']
+          }
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to create appointment reminders', e)
+    }
+
     return NextResponse.json({ appointment: appt })
   } catch (e) {
     console.error('Error creating doctor appointment:', e)

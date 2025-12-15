@@ -73,6 +73,17 @@ enum CarePlanApprovalStatus {
   REJECTED
 }
 
+enum CarePlanTaskKind {
+  TASK
+  REQUEST
+}
+
+enum CareRequestType {
+  PREVISIT_QUESTIONNAIRE
+  BP_7_DAYS
+  UPLOAD_ANALYSIS
+}
+
 enum CarePlanCheckInType {
   COMPLETE
   SNOOZE
@@ -379,6 +390,10 @@ model CarePlanTask {
 
   createdByDoctorId String?
   createdByDoctor   DoctorProfile? @relation("CarePlanTasksCreatedByDoctor", fields: [createdByDoctorId], references: [id], onDelete: SetNull)
+
+  kind         CarePlanTaskKind    @default(TASK)
+  requestType  CareRequestType?
+  meta         Json?
 
   title        String
   description  String?

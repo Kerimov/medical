@@ -56,6 +56,11 @@ export default function DoctorDashboard() {
   const [protocolNote, setProtocolNote] = useState<string>('')
   const [protocolBusy, setProtocolBusy] = useState<boolean>(false)
 
+  const [requestPatientId, setRequestPatientId] = useState<string>('')
+  const [requestAppointmentId, setRequestAppointmentId] = useState<string>('')
+  const [requestNote, setRequestNote] = useState<string>('')
+  const [requestBusy, setRequestBusy] = useState<boolean>(false)
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login')
@@ -142,6 +147,7 @@ export default function DoctorDashboard() {
           const list = Array.isArray(pJson?.patients) ? pJson.patients : []
           setPatients(list)
           if (!protocolPatientId && list.length === 1) setProtocolPatientId(list[0].id)
+          if (!requestPatientId && list.length === 1) setRequestPatientId(list[0].id)
         }
       } catch (e) {
         // ignore
@@ -233,6 +239,49 @@ export default function DoctorDashboard() {
       alert(e instanceof Error ? e.message : 'Ошибка')
     } finally {
       setProtocolBusy(false)
+    }
+  }
+
+  const upcomingForSelected = doctorAppointments
+    .filter((a: any) => a?.patientId && a.patientId === requestPatientId)
+    .filter((a: any) => +new Date(a.scheduledAt) > Date.now())
+    .slice()
+    .sort((a: any, b: any) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))
+
+  async function createRequest(type: 'PREVISIT_QUESTIONNAIRE' | 'BP_7_DAYS' | 'UPLOAD_ANALYSIS') {
+    if (!requestPatientId) {
+      alert('Выберите пациента')
+      return
+    }
+    if (type === 'PREVISIT_QUESTIONNAIRE' && !requestAppointmentId) {
+      alert('Выберите приём для анкеты')
+      return
+    }
+    try {
+      setRequestBusy(true)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const headers = lsToken
+        ? { 'Content-Type': 'application/json', Authorization: `Bearer ${lsToken}` }
+        : { 'Content-Type': 'application/json' }
+      const res = await fetch('/api/doctor/requests', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          patientId: requestPatientId,
+          type,
+          appointmentId: type === 'PREVISIT_QUESTIONNAIRE' ? requestAppointmentId : undefined,
+          note: requestNote || ''
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      alert('Запрос отправлен пациенту')
+      setRequestNote('')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setRequestBusy(false)
     }
   }
 
@@ -573,6 +622,76 @@ export default function DoctorDashboard() {
               <div className="flex justify-end">
                 <Button onClick={applyProtocol} disabled={protocolBusy} className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
                   {protocolBusy ? 'Создаю…' : 'Сформировать план (на согласование)'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Communications (no chat) */}
+        <div className="mt-8">
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                Коммуникации (без чата)
+              </CardTitle>
+              <CardDescription>
+                Запросить данные у пациента: анкета / давление 7 дней / загрузка анализа. Пациент увидит это в “План действий”.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Пациент</div>
+                  <Select value={requestPatientId} onValueChange={(v) => { setRequestPatientId(v); setRequestAppointmentId('') }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите пациента" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patients.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.email ? ` (${p.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Приём (для анкеты)</div>
+                  <Select
+                    value={requestAppointmentId}
+                    onValueChange={setRequestAppointmentId}
+                    disabled={!requestPatientId || upcomingForSelected.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={upcomingForSelected.length ? 'Выберите приём' : 'Нет будущих приёмов'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {upcomingForSelected.map((a: any) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {new Date(a.scheduledAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} • {a.patientName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Комментарий пациенту (опционально)</div>
+                <Textarea value={requestNote} onChange={(e) => setRequestNote(e.target.value)} placeholder="Напр. внесите АД утром/вечером, прикрепите последний анализ..." />
+              </div>
+
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="outline" disabled={requestBusy} onClick={() => createRequest('UPLOAD_ANALYSIS')}>
+                  Загрузить анализ
+                </Button>
+                <Button variant="outline" disabled={requestBusy} onClick={() => createRequest('BP_7_DAYS')}>
+                  Давление 7 дней
+                </Button>
+                <Button disabled={requestBusy} onClick={() => createRequest('PREVISIT_QUESTIONNAIRE')}>
+                  Заполнить анкету
                 </Button>
               </div>
             </CardContent>

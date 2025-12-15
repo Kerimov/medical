@@ -108,18 +108,37 @@ export async function POST(request: NextRequest) {
           select: { id: true }
         })
 
-    const created = await prisma.prescription.create({
-      data: {
-        doctorId: doctor.id,
-        patientRecordId: record.id,
-        medication,
-        dosage,
-        frequency,
-        duration,
-        instructions,
-        isActive: true,
-        expiresAt
-      }
+    const created = await prisma.$transaction(async (tx) => {
+      const p = await tx.prescription.create({
+        data: {
+          doctorId: doctor.id,
+          patientRecordId: record.id,
+          medication,
+          dosage,
+          frequency,
+          duration,
+          instructions,
+          isActive: true,
+          expiresAt
+        }
+      })
+
+      // Авто-напоминание пациенту: после назначения
+      const pref = await tx.reminderPreference.findUnique({ where: { userId: patientId }, select: { email: true, push: true, sms: true } })
+      const channels = [pref?.email ? 'EMAIL' : null, pref?.push ? 'PUSH' : null, pref?.sms ? 'SMS' : null].filter(Boolean)
+      const dueAt = new Date(Date.now() + 60 * 60 * 1000) // через 1 час
+      await tx.reminder.create({
+        data: {
+          userId: patientId,
+          title: `Назначение: ${medication}`,
+          description: `Врач назначил препарат.\n${dosage} • ${frequency} • ${duration}${instructions ? `\nИнструкция: ${instructions}` : ''}`,
+          dueAt,
+          recurrence: 'NONE',
+          channels: channels.length ? channels : ['PUSH']
+        }
+      })
+
+      return p
     })
 
     return NextResponse.json({ prescription: created }, { status: 201 })

@@ -36,6 +36,16 @@ type PendingApproval = {
   doctorName?: string | null
 }
 
+type RequestTask = {
+  id: string
+  title: string
+  description?: string | null
+  dueAt?: string | null
+  requestType?: string | null
+  meta?: any
+  doctorName?: string | null
+}
+
 function statusLabel(s: TaskStatus) {
   if (s === 'ACTIVE') return 'Активно'
   if (s === 'SNOOZED') return 'Отложено'
@@ -53,6 +63,7 @@ export default function CarePlanPage() {
   const router = useRouter()
 
   const [tasks, setTasks] = useState<Task[]>([])
+  const [requests, setRequests] = useState<RequestTask[]>([])
   const [pending, setPending] = useState<PendingApproval[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,6 +117,24 @@ export default function CarePlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, token])
 
+  async function fetchRequests() {
+    if (!token) return
+    try {
+      const res = await fetch('/api/care-plan/requests', { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Ошибка')
+      setRequests(Array.isArray(data?.requests) ? data.requests : [])
+    } catch (e) {
+      console.warn('Failed to load requests', e)
+      setRequests([])
+    }
+  }
+
+  useEffect(() => {
+    if (user && token) fetchRequests()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, token])
+
   const grouped = useMemo(() => {
     const by: Record<TaskStatus, Task[]> = { ACTIVE: [], SNOOZED: [], COMPLETED: [] }
     for (const t of tasks) by[t.status]?.push(t)
@@ -144,7 +173,7 @@ export default function CarePlanPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Ошибка')
-      await fetchTasks()
+      await Promise.all([fetchTasks(), fetchRequests()])
     } finally {
       setBusyId(null)
     }
@@ -182,6 +211,71 @@ export default function CarePlanPage() {
 
         {error && (
           <div className="text-sm text-destructive">{error}</div>
+        )}
+
+        {/* Requests from doctor */}
+        {requests.length > 0 && (
+          <Card className="bg-white/70 border">
+            <CardHeader>
+              <CardTitle className="text-base">Запросы от врача</CardTitle>
+              <CardDescription>Здесь нет чата — только конкретные действия, которые попросил врач.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {requests.map((r) => {
+                const meta = r.meta || {}
+                const appointmentId = typeof meta?.appointmentId === 'string' ? meta.appointmentId : null
+                const actionHref =
+                  r.requestType === 'PREVISIT_QUESTIONNAIRE' && appointmentId ? `/pre-visit/${appointmentId}` :
+                  r.requestType === 'BP_7_DAYS' ? '/diary' :
+                  r.requestType === 'UPLOAD_ANALYSIS' ? '/documents' :
+                  '/care-plan'
+
+                const actionLabel =
+                  r.requestType === 'PREVISIT_QUESTIONNAIRE' ? 'Заполнить анкету' :
+                  r.requestType === 'BP_7_DAYS' ? 'Открыть дневник' :
+                  r.requestType === 'UPLOAD_ANALYSIS' ? 'Загрузить документ' :
+                  'Открыть'
+
+                return (
+                  <div key={r.id} className="p-4 border rounded-lg bg-background/60 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{r.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {r.doctorName ? `Доктор: ${r.doctorName}` : 'Доктор: —'}
+                          {r.requestType ? ` • ${r.requestType}` : ''}
+                        </div>
+                        {r.description ? (
+                          <div className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{r.description}</div>
+                        ) : null}
+                      </div>
+                      <Badge className="bg-blue-100 text-blue-800">Запрос</Badge>
+                    </div>
+
+                    {r.dueAt ? (
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <CalendarClock className="h-4 w-4" />
+                        Срок: {new Date(r.dueAt).toLocaleDateString('ru-RU')}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Link href={actionHref}>
+                        <Button size="sm" variant="outline">{actionLabel}</Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        disabled={busyId === r.id}
+                        onClick={() => patchTask(r.id, { action: 'complete', reason: 'Выполнено (запрос врача)' })}
+                      >
+                        Отметить выполненным
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
         )}
 
         {/* Pending approvals */}
