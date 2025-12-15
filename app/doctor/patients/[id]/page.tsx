@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 //
 import { Users, Calendar, FileText, Stethoscope, Pill, NotebookPen } from 'lucide-react'
 
@@ -37,6 +38,12 @@ export default function PatientCardPage() {
   const [timelineMode, setTimelineMode] = useState<'all' | 'important'>('all')
   const [problemDraft, setProblemDraft] = useState<string>('')
   const [problemSaving, setProblemSaving] = useState(false)
+
+  const [aiInput, setAiInput] = useState<string>('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiAnswer, setAiAnswer] = useState<string>('')
+  const [aiSources, setAiSources] = useState<Array<{ sourceType?: string; id?: string; label?: string; date?: string | null; url?: string | null }>>([])
+  const [aiError, setAiError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -151,6 +158,51 @@ export default function PatientCardPage() {
     timelineMode === 'important'
       ? timeline.filter((x) => x.kind !== 'document').slice(0, 25)
       : timeline.slice(0, 35)
+
+  const quickPrompts = useMemo(() => {
+    return [
+      {
+        key: 'questions',
+        label: 'Вопросы пациенту',
+        text: 'Сформулируй 10 уточняющих вопросов пациенту (строго по источникам).'
+      },
+      {
+        key: 'labs',
+        label: 'Какие анализы докинуть',
+        text: 'Какие анализы/исследования стоит добавить и зачем (строго по данным источников)?'
+      },
+      {
+        key: 'trend',
+        label: 'Объяснить динамику',
+        text: 'Что может объяснить динамику показателей? Дай гипотезы и что проверить далее (строго по источникам).'
+      }
+    ]
+  }, [])
+
+  async function askDoctorAI(message: string, mode: string) {
+    try {
+      setAiBusy(true)
+      setAiError(null)
+      const lsToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+      const headers = lsToken ? { 'Content-Type': 'application/json', Authorization: `Bearer ${lsToken}` } : { 'Content-Type': 'application/json' }
+      const res = await fetch('/api/doctor/ai/second-opinion', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ patientId: patient.id, message, mode })
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j?.error || 'Ошибка')
+      setAiAnswer(String(j?.response || ''))
+      setAiSources(Array.isArray(j?.sources) ? j.sources : [])
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'Ошибка')
+      setAiAnswer('')
+      setAiSources([])
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   async function saveProblemList() {
     try {
@@ -408,6 +460,69 @@ export default function PatientCardPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="glass-effect border-0 shadow-medical">
+            <CardHeader>
+              <CardTitle>Второе мнение (AI для врача)</CardTitle>
+              <CardDescription>
+                Строго по данным пациента. В ответе всегда есть источники (анализы/документы/анкета).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {quickPrompts.map((p) => (
+                  <Button
+                    key={p.key}
+                    size="sm"
+                    variant="outline"
+                    disabled={aiBusy}
+                    onClick={() => {
+                      setAiInput(p.text)
+                      askDoctorAI(p.text, p.key)
+                    }}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <Input value={aiInput} onChange={(e) => setAiInput(e.target.value)} placeholder="Спросите: вопросы/что досдать/почему динамика…" />
+                <Button disabled={aiBusy || !aiInput.trim()} onClick={() => askDoctorAI(aiInput.trim(), 'free')}>
+                  {aiBusy ? 'Думаю…' : 'Спросить'}
+                </Button>
+              </div>
+
+              {aiError ? <div className="text-sm text-destructive">{aiError}</div> : null}
+
+              {aiAnswer ? (
+                <pre className="whitespace-pre-wrap text-sm bg-white/70 border rounded p-3 max-h-[45vh] overflow-auto">{aiAnswer}</pre>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Нажмите кнопку сверху или задайте вопрос. Если данных мало — попросите пациента загрузить документ/анализ или заполнить pre‑visit.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Источники</div>
+                {aiSources.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">—</div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {aiSources.map((s) =>
+                      s?.url ? (
+                        <Link key={`${s.sourceType}:${s.id}`} href={String(s.url)}>
+                          <Badge variant="secondary" className="cursor-pointer hover:underline">{s.label || `${s.sourceType}:${s.id}`}</Badge>
+                        </Link>
+                      ) : (
+                        <Badge key={`${s.sourceType}:${s.id}`} variant="secondary">{s.label || `${s.sourceType}:${s.id}`}</Badge>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
